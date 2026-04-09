@@ -1,0 +1,92 @@
+---
+description: Best practices and conventions for Next.js applications
+globs: **/*.{jsx,tsx,js,ts}
+alwaysApply: false
+---
+
+# Next.js Rules
+
+## Router Choice
+
+- Use the **App Router** (`app/`) for all new projects (Next.js 13+).
+- Keep the Pages Router (`pages/`) only in legacy projects; do not mix the two routers in the same project.
+
+## Server vs. Client Components
+
+- Components in the `app/` directory are **Server Components by default** — keep them server-side unless interactivity is required.
+- Add `"use client"` only when a component needs browser APIs, React hooks, or event listeners.
+- Keep `"use client"` boundaries as **deep in the tree as possible** to maximise server rendering.
+- Never import a Client Component into a Server Component without a boundary; pass server data as props instead.
+
+## Data Fetching
+
+- Fetch data directly inside Server Components using `async/await`; avoid `useEffect` for initial data loading.
+- Use `fetch` with Next.js cache options (`cache: 'force-cache'`, `next: { revalidate: N }`) instead of manual caching layers.
+- Use `React.cache` to deduplicate fetch calls across the same request.
+- Prefer **React Server Actions** for form mutations; avoid separate API routes for simple CRUD operations.
+
+## Routing & Navigation
+
+- Use the `<Link>` component from `next/link` for all internal navigation — never use `<a>` tags directly.
+- Use `useRouter` (from `next/navigation` in App Router) only for programmatic navigation.
+- Use dynamic segments (`[slug]`, `[...slug]`) and generate static params with `generateStaticParams`.
+- Co-locate `loading.tsx`, `error.tsx`, and `not-found.tsx` with their route segments.
+
+## Layouts & Templates
+
+- Use `layout.tsx` for persistent UI (nav, sidebars) that should not re-mount on navigation.
+- Use `template.tsx` when you need a fresh instance of the component on each navigation.
+- Share root metadata in the root `layout.tsx`; override per route with `generateMetadata`.
+
+## Images & Fonts
+
+- Always use `next/image` for images; supply `width`, `height`, and meaningful `alt` text.
+- Use `next/font` to load fonts — it eliminates external network requests and prevents layout shift.
+
+## Metadata & SEO
+
+- Export a `metadata` object or a `generateMetadata` function from every `page.tsx`.
+- Include `title`, `description`, and Open Graph tags at minimum.
+
+## API Routes (Route Handlers)
+
+- Place route handlers in `app/api/.../route.ts` following REST conventions.
+- Export named functions matching HTTP verbs (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`).
+- Return `NextResponse` objects with explicit status codes and typed JSON bodies.
+- Validate and sanitise all incoming request data before processing.
+
+## Environment Variables
+
+- Prefix public variables with `NEXT_PUBLIC_`; keep secrets server-side only.
+- Never access `process.env` inside Client Components.
+- Document all required env vars in `.env.example`.
+
+## Performance
+
+- Enable **Partial Prerendering (PPR)** for pages that mix static and dynamic content (Next.js 14+).
+- Use `React.lazy` / dynamic imports (`next/dynamic`) with `{ ssr: false }` for heavy client-only libraries.
+- Avoid large third-party scripts; load them via `next/script` with the appropriate `strategy`.
+
+## File & Folder Structure
+
+```
+app/
+  (group)/             # Route groups (no URL segment)
+  [param]/             # Dynamic routes
+  layout.tsx
+  page.tsx
+  loading.tsx
+  error.tsx
+components/            # Shared UI components
+lib/                   # Utilities, helpers, server-side logic
+actions/               # Server Actions
+hooks/                 # Custom client hooks
+types/
+public/
+```
+
+## Testing
+
+- Use **Vitest** or **Jest** with React Testing Library for unit/component tests.
+- Use **Playwright** or **Cypress** for end-to-end tests against a running Next.js dev or preview build.
+- Mock `next/navigation` hooks in unit tests.

@@ -1,0 +1,81 @@
+---
+description: Best practices and conventions for React applications
+globs: **/*.{jsx,tsx}
+alwaysApply: false
+---
+
+# React Rules
+
+## Component Design
+
+- Use **functional components** exclusively; avoid class components.
+- Keep components small and focused on a single responsibility.
+- Co-locate component files with their styles and tests.
+- Use named exports for components; reserve default exports for page-level components.
+
+## Hooks
+
+- Call hooks only at the top level — never inside loops, conditions, or nested functions.
+- Use `useState` for local UI state; lift state up only when siblings need it.
+- Use `useEffect` for side effects; always specify a dependency array.
+- Clean up subscriptions, timers, and event listeners in the `useEffect` return function.
+- Extract reusable stateful logic into custom hooks (`use` prefix required).
+- Prefer `useReducer` over multiple related `useState` calls for complex state.
+- Use `useMemo` to memoize expensive computations; use `useCallback` to stabilize function references passed as props.
+
+## Props & Types
+
+- Define prop types with **TypeScript interfaces**; avoid `any`.
+- Mark optional props explicitly with `?`.
+- Destructure props at the function signature level.
+- Use `React.FC<Props>` sparingly — prefer plain function signatures with typed parameters.
+- Pass only the props a component needs; avoid prop drilling more than two levels deep (use Context or a state manager instead).
+
+## Performance
+
+- Wrap pure child components with `React.memo` to prevent unnecessary re-renders.
+- Use `React.lazy` + `Suspense` for code-splitting route-level and heavy components.
+- Avoid creating objects or functions inline inside JSX when they are used as props for memoized children.
+- Use the **React DevTools Profiler** to identify and fix performance bottlenecks before optimising speculatively.
+
+## State Management
+
+- Use React Context for low-frequency global state (theme, locale, auth user).
+- Use Zustand, Redux Toolkit, or Jotai for high-frequency or complex shared state.
+- Keep derived data out of state — compute it from existing state during render or with `useMemo`.
+
+## Styling
+
+- Prefer CSS Modules or a CSS-in-JS library (e.g., styled-components, Emotion) for component-scoped styles.
+- Avoid inline `style` objects for anything beyond truly dynamic values.
+
+## Event Handling
+
+- Name event handler props `onX` (e.g., `onClick`, `onChange`).
+- Name handler implementations `handleX` inside the component.
+
+## Accessibility
+
+- Use semantic HTML elements (`<button>`, `<nav>`, `<main>`, etc.) instead of styled `<div>` wrappers.
+- Always provide meaningful `alt` text for `<img>` elements.
+- Ensure interactive elements are keyboard-navigable.
+- Use `aria-*` attributes only when native semantics are insufficient.
+
+## File & Folder Structure
+
+```
+src/
+  components/        # Shared/reusable components
+  features/          # Feature-scoped components, hooks, slices
+  hooks/             # Global custom hooks
+  pages/ (or routes/)
+  utils/
+  types/
+```
+
+## Testing
+
+- Test behaviour, not implementation details.
+- Use **React Testing Library** with `userEvent` for interaction tests.
+- Mock external dependencies (API calls, context) at the module level.
+- Write at least one test per component covering its primary use case.

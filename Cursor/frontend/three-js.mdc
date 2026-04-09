@@ -1,0 +1,95 @@
+---
+description: Best practices and conventions for Three.js 3D graphics applications
+globs: **/*.{js,ts,jsx,tsx}
+alwaysApply: false
+---
+
+# Three.js Rules
+
+## Scene Setup
+
+- Always create the three core objects before anything else: **Scene**, **Camera**, and **WebGLRenderer**.
+- Use `PerspectiveCamera(fov, aspect, near, far)`; set `near` as large as possible and `far` as small as possible to maximise depth-buffer precision.
+- Update the camera aspect ratio and call `camera.updateProjectionMatrix()` whenever the window is resized.
+- Attach the renderer's `domElement` (canvas) to the DOM and resize the renderer with `renderer.setSize(width, height)`.
+- Call `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` to balance sharpness and performance.
+
+## Animation Loop
+
+- Use `renderer.setAnimationLoop(callback)` (or `requestAnimationFrame`) for the render loop — never use `setInterval`.
+- Keep the animation callback pure: update object state, then call `renderer.render(scene, camera)`.
+- Use a **Clock** (`THREE.Clock`) for time-based animations instead of relying on frame count.
+
+```js
+const clock = new THREE.Clock();
+
+renderer.setAnimationLoop(() => {
+  const delta = clock.getDelta();
+  // update objects using delta
+  renderer.render(scene, camera);
+});
+```
+
+## Geometries & Materials
+
+- Reuse geometries and materials across multiple meshes — creating them per-instance wastes memory.
+- Dispose of geometries (`geometry.dispose()`) and materials (`material.dispose()`) when they are no longer needed.
+- Use `BufferGeometry` directly; the legacy `Geometry` class was removed in Three.js r125.
+- Prefer **MeshStandardMaterial** or **MeshPhysicalMaterial** for PBR shading; use **MeshBasicMaterial** only for unlit objects.
+- Set `material.side = THREE.FrontSide` (default) unless double-sided rendering is explicitly needed.
+
+## Lighting
+
+- Add at least an `AmbientLight` for base illumination and a directional or point light for shadows.
+- Enable shadows selectively: `renderer.shadowMap.enabled = true`, then set `castShadow` and `receiveShadow` only on meshes that need them.
+- Use `renderer.shadowMap.type = THREE.PCFSoftShadowMap` for soft shadow edges.
+
+## Textures & Loaders
+
+- Use `TextureLoader` (or `GLTFLoader`, `DRACOLoader`, etc.) and handle the loading lifecycle with callbacks or Promises.
+- Always call `texture.dispose()` when a texture is no longer in use.
+- Set `texture.colorSpace = THREE.SRGBColorSpace` for colour textures; leave it as `LinearSRGBColorSpace` for normal/roughness maps.
+- Use a single shared `LoadingManager` to track global loading progress.
+
+## 3D Models
+
+- Prefer **GLTF/GLB** format for models — it is the standard format recommended by Three.js.
+- Use `DRACOLoader` for compressed GLTF meshes to reduce file size.
+- Traverse loaded scenes with `object.traverse()` to configure shadows or swap materials.
+
+## Performance
+
+- Minimise draw calls by merging static geometries with `BufferGeometryUtils.mergeGeometries`.
+- Use `InstancedMesh` for large numbers of identical objects.
+- Cull objects that are off-screen: enable `object.frustumCulled = true` (default).
+- Use `renderer.info` to monitor draw calls, triangles, and textures during development.
+- Avoid creating new `Vector3`, `Quaternion`, or `Matrix4` objects inside the render loop — reuse instances.
+
+## Resource Cleanup
+
+- When tearing down a Three.js scene (e.g., component unmount in React), stop the animation loop, dispose all geometries/materials/textures, and call `renderer.dispose()`.
+
+```js
+function cleanup() {
+  renderer.setAnimationLoop(null);
+  scene.traverse((object) => {
+    if (object.geometry) object.geometry.dispose();
+    if (object.material) {
+      const mats = Array.isArray(object.material) ? object.material : [object.material];
+      mats.forEach((m) => m.dispose());
+    }
+  });
+  renderer.dispose();
+}
+```
+
+## Integration with React (React Three Fiber)
+
+- Prefer **React Three Fiber (R3F)** when building Three.js scenes inside React apps — it handles the render loop and cleanup automatically.
+- Use **@react-three/drei** for common helpers (OrbitControls, Environment, Text, etc.).
+- Use **@react-three/postprocessing** for post-processing effects.
+
+## Controls
+
+- Use `OrbitControls` from `three/examples/jsm/controls/OrbitControls.js` for camera interaction.
+- Always call `controls.update()` inside the animation loop when `enableDamping` is `true`.
