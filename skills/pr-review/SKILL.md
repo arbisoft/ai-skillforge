@@ -68,13 +68,17 @@ Review each file's diff for:
 
 Build and submit the review in a single API call so all comments are grouped into one review, rather than individual standalone comments.
 
+Write the review payload to a temp file, submit it, then clean up:
+
 ```bash
 gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
   --method POST \
-  --input review.json
+  --input /tmp/review.json
+
+rm /tmp/review.json
 ```
 
-**Construct `review.json`** with this structure:
+**Construct `/tmp/review.json`** with this structure:
 
 ```json
 {

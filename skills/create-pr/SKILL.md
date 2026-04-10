@@ -44,11 +44,11 @@ If the user specifies a different base, use that instead.
 
 ### Step 3: Gather commit history for the PR body
 
-Get all commits on this branch since it diverged from the base:
+Get all commits on this branch since it diverged from the base (replace `<base>` with the branch name from Step 2):
 
 ```bash
-git log --oneline BASE_BRANCH..HEAD
-git diff BASE_BRANCH...HEAD --stat
+git log --oneline <base>..HEAD
+git diff <base>...HEAD --stat
 ```
 
 ### Step 4: Draft the PR title and body
@@ -72,16 +72,35 @@ Show the draft to the user before submitting if there's any ambiguity. For strai
 
 ### Step 5: Push the branch
 
+Check whether you have push access to `origin`. If `origin` points to a repo you don't own (common in open-source), fork first:
+
+```bash
+gh repo fork --remote=true
+```
+
+This sets `origin` to your fork and `upstream` to the original repo. Then push:
+
 ```bash
 git push -u origin HEAD
 ```
 
-If the push fails due to upstream not being set or permissions, report the error.
-
 ### Step 6: Create the PR
 
+**Same-repo workflow** (you have push access to origin):
+
 ```bash
-gh pr create --title "TITLE" --body "BODY" --base BASE_BRANCH
+gh pr create --title "TITLE" --body "BODY" --base <base>
+```
+
+**Fork workflow** (origin is your fork, upstream is the target repo):
+
+```bash
+gh pr create \
+  --repo UPSTREAM_OWNER/REPO \
+  --head YOUR_USERNAME:BRANCH \
+  --base <base> \
+  --title "TITLE" \
+  --body "BODY"
 ```
 
 Use a HEREDOC for the body to preserve formatting:
@@ -118,5 +137,6 @@ After creation, output the PR URL so the user can access it directly.
 
 - If `gh auth status` fails, tell the user to run `gh auth login`.
 - If no remote exists, tell the user to add one with `git remote add origin <url>`.
+- If the push fails with a 403 or permission denied, the user likely doesn't have write access — fork the repo with `gh repo fork --remote=true` and retry.
 - If the branch is already up-to-date with base (no commits), warn that the PR will be empty.
 - If a PR already exists for this branch, show the existing PR URL instead of creating a duplicate.
