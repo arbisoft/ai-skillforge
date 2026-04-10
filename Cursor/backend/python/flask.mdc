@@ -1,0 +1,473 @@
+---
+description: Definitive best practices for building robust, scalable, secure, and maintainable Flask applications using modern Flask 3.x patterns.
+globs: **/*.py
+---
+# Flask Best Practices
+
+This guide defines the non-negotiable standards for writing production-grade Flask applications using modern Flask 3.x conventions.
+
+## 1. Project Architecture: Application Factory + Blueprints
+
+Always structure Flask apps as packages using the **application factory pattern** and **Blueprints**.
+
+This is the official recommended Flask architecture because it improves:
+
+- testability
+- modularity
+- multiple environment support
+- extension reuse
+- CLI integration
+- middleware composition
+
+### 1.1 Application Factory
+
+❌ **BAD**
+```python
+from flask import Flask
+
+app = Flask(__name__)
+```
+
+✅ **GOOD**
+
+```python
+# myapp/__init__.py
+from flask import Flask
+from .config import Config
+from .extensions import db, migrate, csrf
+
+def create_app(config_class: type[Config] = Config) -> Flask:
+    app = Flask(__name__)
+    app.config.from_object(config_class)
+
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+
+    from .auth import auth_bp
+    from .api import api_bp
+    from .errors import errors_bp
+
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(errors_bp)
+
+    return app
+```
+
+✅ **CLI Startup (Preferred)**
+
+```bash
+flask --app myapp:create_app run
+```
+
+Never rely on legacy `run.py` entrypoints for serious applications.
+
+### 1.2 Blueprints for Modularity
+
+Every major domain must be isolated into Blueprints:
+
+* auth
+* users
+* billing
+* admin
+* api
+* errors
+
+✅ **GOOD**
+
+```python
+# myapp/auth/__init__.py
+from flask import Blueprint
+
+auth_bp = Blueprint("auth", __name__)
+
+from . import routes
+```
+
+```python
+# myapp/auth/routes.py
+from flask import render_template
+from . import auth_bp
+
+@auth_bp.get("/login")
+def login():
+    return render_template("auth/login.html")
+```
+
+---
+
+## 2. Configuration Management
+
+All configuration must be environment-driven.
+
+Never hardcode:
+
+* secrets
+* database URLs
+* API keys
+* debug flags
+* service credentials
+
+✅ **GOOD**
+
+```python
+import os
+
+class Config:
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = True
+    REMEMBER_COOKIE_SECURE = True
+```
+
+### Rules
+
+* `.env` allowed only for local development
+* `.env` must never be committed
+* provide `.env.example`
+* production secrets must come from vault/KMS/secret manager
+
+---
+
+## 3. Extensions Pattern
+
+All Flask extensions must be initialized **unbound first**, then attached in factory.
+
+❌ **BAD**
+
+```python
+db = SQLAlchemy(app)
+```
+
+✅ **GOOD**
+
+```python
+# extensions.py
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
+
+db = SQLAlchemy()
+migrate = Migrate()
+csrf = CSRFProtect()
+```
+
+```python
+# __init__.py
+from .extensions import db, migrate
+
+db.init_app(app)
+migrate.init_app(app, db)
+```
+
+This is the officially preferred Flask extension lifecycle.
+
+---
+
+## 4. Async: Use Carefully
+
+Flask supports `async def` views, but this **does NOT automatically make Flask high-concurrency**.
+
+Important rule:
+
+> Async in Flask improves **concurrent I/O inside a single request**, not total request throughput under standard WSGI deployment. ([flask.palletsprojects.com][1])
+
+Use async only for:
+
+* multiple external HTTP requests
+* async DB clients
+* concurrent API aggregation
+* parallel I/O waits
+
+✅ **GOOD**
+
+```python
+from flask import jsonify
+import asyncio
+
+@api_bp.get("/aggregate")
+async def aggregate():
+    await asyncio.sleep(1)
+    return jsonify({"ok": True})
+```
+
+### Critical Rule
+
+Do **NOT** use async for:
+
+* CPU-heavy tasks
+* image processing
+* PDF generation
+* ML inference
+* long-running jobs
+
+Use Celery, RQ, or Dramatiq instead.
+
+### Background Task Rule
+
+Never do this:
+
+```python
+asyncio.create_task(do_work())
+```
+
+Flask request event loops end after response completion, causing spawned tasks to be cancelled. ([flask.palletsprojects.com][1])
+
+---
+
+## 5. Database Standards
+
+### Mandatory
+
+* SQLAlchemy ORM
+* Alembic migrations via Flask-Migrate
+* transaction boundaries
+* eager loading for relationships
+* no raw SQL unless benchmark-proven
+
+✅ **GOOD**
+
+```python
+users = User.query.options(db.joinedload(User.posts)).all()
+```
+
+### Rules
+
+* prevent N+1 queries
+* use indexes
+* paginate large collections
+* use explicit session rollback on failure
+
+---
+
+## 6. Validation & Serialization
+
+Never trust `request.json` directly.
+
+All input must be validated.
+
+Preferred:
+
+* Pydantic
+* Marshmallow
+* WTForms (HTML forms only)
+
+✅ **GOOD**
+
+```python
+from pydantic import BaseModel, EmailStr
+
+class LoginPayload(BaseModel):
+    email: EmailStr
+    password: str
+```
+
+```python
+payload = LoginPayload(**request.get_json())
+```
+
+---
+
+## 7. Security Requirements
+
+### Mandatory
+
+* CSRF for all state-changing forms
+* secure cookies
+* HTTPS only
+* CSP headers
+* HSTS
+* input validation
+* ORM parameterization
+* rate limiting
+* auth decorators
+* secret rotation
+
+### Security Headers
+
+```python
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    return response
+```
+
+Recommended:
+
+* Flask-Talisman
+* Flask-Limiter
+* Flask-Login
+* OAuth via Authlib
+
+---
+
+## 8. Error Handling & Logging
+
+Never allow raw stack traces in production responses.
+
+✅ **GOOD**
+
+```python
+@errors_bp.app_errorhandler(404)
+def not_found(error):
+    return {"error": "Not found"}, 404
+```
+
+```python
+@errors_bp.app_errorhandler(500)
+def server_error(error):
+    current_app.logger.exception("Unhandled exception")
+    return {"error": "Internal server error"}, 500
+```
+
+### Logging Rules
+
+Mandatory structured logging:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+```
+
+Preferred:
+
+* JSON logs
+* request IDs
+* correlation IDs
+* Sentry
+* OpenTelemetry tracing
+
+---
+
+## 9. API Design Standards
+
+Rules:
+
+* nouns for resources
+* plural endpoints
+* proper HTTP verbs
+* consistent status codes
+* JSON only for APIs
+* pagination required
+* version APIs (`/api/v1`)
+
+✅ **GOOD**
+
+```python
+@api_bp.get("/users")
+def list_users():
+    return {"items": []}
+```
+
+```python
+@api_bp.post("/users")
+def create_user():
+    return {"id": 1}, 201
+```
+
+---
+
+## 10. Production Deployment
+
+Never use:
+
+```python
+app.run()
+```
+
+Production requires real servers.
+
+### WSGI
+
+```bash
+gunicorn "myapp:create_app()"
+```
+
+### ASGI Bridge (for async-heavy workloads)
+
+```bash
+hypercorn myapp:create_app
+```
+
+### Reverse Proxy
+
+Always deploy behind:
+
+* Nginx
+* Caddy
+* Traefik
+* cloud load balancer
+
+### Proxy Fix
+
+```python
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+```
+
+---
+
+## 11. Testing Standards
+
+Mandatory:
+
+* pytest
+* app fixtures
+* test database
+* client fixtures
+* request factories
+* integration tests
+* API contract tests
+
+✅ **GOOD**
+
+```python
+def test_health(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+```
+
+---
+
+## 12. Type Hints Are Mandatory
+
+All new Python code must use type hints.
+
+✅ **GOOD**
+
+```python
+def calculate_total(price: float, quantity: int) -> float:
+    return price * quantity
+```
+
+Mandatory tooling:
+
+* mypy
+* pyright
+* Ruff
+* Black
+
+---
+
+## 13. When Flask Is the Wrong Choice
+
+Do not force Flask into workloads better suited for:
+
+* websockets
+* async-first systems
+* streaming-heavy services
+* ultra-high concurrency APIs
+
+For these, prefer:
+
+* FastAPI
+* Quart
+* Starlette
+
+[1]: https://flask.palletsprojects.com/en/stable/async-await/ "Using async and await — Flask Documentation (3.1.x)"

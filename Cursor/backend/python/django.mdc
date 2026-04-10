@@ -1,0 +1,522 @@
+---
+description: Definitive guidelines for writing maintainable, performant, secure, async-safe, and type-safe Django applications using modern Django 5/6 best practices, domain-driven architecture, service layers, optimized ORM usage, and production-grade deployment patterns.
+globs: **/*.py
+---
+# django Best Practices
+
+This guide defines the definitive best practices for building **modern Django 5+ and Django 6 applications** with strong maintainability, performance, security, and scalability. It incorporates **official Django async constraints**, modern storage conventions, typed APIs, and production-safe deployment rules. :contentReference[oaicite:0]{index=0}
+
+These rules emphasize:
+
+- domain-driven app boundaries
+- explicit settings management
+- service-layer architecture
+- ORM query optimization
+- transaction-safe writes
+- async-safe patterns
+- DRF best practices
+- type safety with `django-stubs`
+- production deployment correctness
+
+---
+
+## 1. Code Organization & Project Structure
+
+Prefer a **`src/` layout** for medium and large projects.
+
+Organize apps by **business domain**, not technical layer.
+
+### ✅ GOOD: Modern `src` Layout
+
+```python
+.
+├── manage.py
+├── src/
+│   ├── config/
+│   │   ├── settings/
+│   │   │   ├── base.py
+│   │   │   ├── development.py
+│   │   │   └── production.py
+│   │   ├── urls.py
+│   │   ├── asgi.py
+│   │   └── wsgi.py
+│   ├── apps/
+│   │   ├── users/
+│   │   ├── products/
+│   │   ├── orders/
+│   │   └── billing/
+│   └── common/
+```
+
+### ✅ GOOD: Domain-Driven Apps
+
+Each app should own:
+
+* models
+* services
+* selectors
+* serializers
+* views
+* permissions
+* tasks
+* tests
+
+```python id="apps-layout"
+apps/orders/
+├── models.py
+├── services.py
+├── selectors.py
+├── serializers.py
+├── views.py
+├── permissions.py
+├── tasks.py
+└── tests/
+```
+
+### ❌ BAD: Global `utils.py` Dumping Ground
+
+Avoid giant cross-project utility files and circular imports.
+
+---
+
+## 2. Settings & Secrets
+
+Always split settings by environment.
+
+### ✅ GOOD: Split Settings
+
+```python id="settings-base"
+# src/config/settings/base.py
+import environ
+
+env = environ.Env()
+environ.Env.read_env()
+
+SECRET_KEY = env("SECRET_KEY")
+DEBUG = env.bool("DEBUG", default=False)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
+```
+
+```python id="settings-prod"
+# src/config/settings/production.py
+from .base import *
+
+DEBUG = False
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000
+```
+
+### ❌ BAD: Hardcoded Secrets
+
+```python id="bad-secrets"
+SECRET_KEY = "dev-secret"
+DEBUG = True
+```
+
+Never commit:
+
+* secrets
+* cloud keys
+* JWT secrets
+* DB passwords
+* API tokens
+
+---
+
+## 3. Business Logic: Service Layer First
+
+Views and serializers should stay thin.
+
+Use:
+
+* **services** → writes / workflows
+* **selectors** → reads / query composition
+* **models** → entity rules and invariants
+
+### ✅ GOOD: Transaction-Safe Service
+
+```python id="service-layer"
+from django.db import transaction
+from django.core.exceptions import ValidationError
+
+@transaction.atomic
+def create_order(*, user, product, quantity):
+    if product.stock < quantity:
+        raise ValidationError("Not enough stock")
+
+    order = Order.objects.create(
+        user=user,
+        product=product,
+        quantity=quantity,
+    )
+
+    product.stock -= quantity
+    product.save(update_fields=["stock"])
+
+    return order
+```
+
+### ❌ BAD: Workflow Logic in Views
+
+Avoid multi-step writes, emails, stock checks, and external API calls inside views.
+
+---
+
+## 4. ORM Performance
+
+ORM optimization is one of the most important Django scaling rules.
+
+### ✅ GOOD: Prevent N+1 Queries
+
+Use `select_related()` for:
+
+* foreign keys
+* one-to-one
+
+```python id="select-related"
+users = User.objects.select_related("profile")
+```
+
+Use `prefetch_related()` for:
+
+* many-to-many
+* reverse foreign keys
+
+```python id="prefetch-related"
+books = Book.objects.prefetch_related("authors")
+```
+
+### ✅ GOOD: Selector Pattern
+
+```python id="selector"
+def get_recent_orders_for_user(user):
+    return (
+        Order.objects
+        .filter(user=user)
+        .select_related("product")
+        .order_by("-created_at")
+    )
+```
+
+### ✅ GOOD: Explicit Indexes
+
+```python id="indexes"
+class Order(models.Model):
+    status = models.CharField(max_length=50, db_index=True)
+    created_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+        ]
+```
+
+### ❌ BAD: Indexing Every Field
+
+Only index fields used in:
+
+* filters
+* ordering
+* joins
+* uniqueness constraints
+
+---
+
+## 5. Transactions & Concurrency Safety
+
+Critical writes must be atomic and race-safe.
+
+### ✅ GOOD: Use `transaction.atomic`
+
+```python id="atomic"
+@transaction.atomic
+def transfer_balance():
+    ...
+```
+
+### ✅ GOOD: Use Row Locks for Race Conditions
+
+```python id="for-update"
+product = Product.objects.select_for_update().get(id=product_id)
+```
+
+Required for:
+
+* stock decrement
+* booking systems
+* wallets
+* coupon redemption
+* seat reservations
+
+---
+
+## 6. Async Django Best Practices
+
+Django async support is mature, but there are **strict ORM and transaction constraints**. ([Django Project][1])
+
+### ✅ GOOD: Native Async ORM
+
+Use async ORM methods in async views.
+
+```python id="async-orm"
+async def my_view(request):
+    user = await User.objects.aget(id=request.user.id)
+    return JsonResponse({"username": user.username})
+```
+
+Supported patterns include:
+
+* `aget()`
+* `acreate()`
+* `aupdate()`
+* `adelete()`
+* `async for queryset`
+
+([Django Project][1])
+
+---
+
+### ✅ GOOD: `sync_to_async(..., thread_sensitive=True)`
+
+When wrapping sync Django code, always use thread-sensitive mode. This is the official safe default. ([Django Project][1])
+
+```python id="sync-to-async"
+from asgiref.sync import sync_to_async
+
+result = await sync_to_async(sync_function, thread_sensitive=True)()
+```
+
+---
+
+### ⚠️ HARD RULE: Transactions Do NOT Work in Async Mode
+
+This is the most important async constraint from the official docs. ([Django Project][1])
+
+### ✅ GOOD: Wrap Transactional Code in Sync Function
+
+```python id="async-transaction-safe"
+from asgiref.sync import sync_to_async
+from django.db import transaction
+
+def sync_create_order():
+    with transaction.atomic():
+        ...
+
+async def async_view(request):
+    await sync_to_async(sync_create_order, thread_sensitive=True)()
+```
+
+### ❌ BAD: Async `transaction.atomic()`
+
+Never use transactional workflows directly inside async code.
+
+---
+
+### ✅ GOOD: Disable Persistent DB Connections in Async Mode
+
+Official Django docs explicitly recommend disabling persistent DB connections in async deployments. ([Django Project][1])
+
+```python id="conn-max-age"
+CONN_MAX_AGE = 0
+```
+
+Use DB-native pooling instead.
+
+---
+
+## 7. Security Best Practices
+
+Security must be production-first.
+
+### ✅ GOOD: Secure Defaults
+
+```python id="security"
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000
+```
+
+### ✅ GOOD: DRF Permissions
+
+```python id="drf-perms"
+from rest_framework.permissions import IsAdminUser
+
+class AdminView(APIView):
+    permission_classes = [IsAdminUser]
+```
+
+### ✅ GOOD: Modern `STORAGES` Config
+
+Use Django’s modern storage backend configuration.
+
+```python id="storages"
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+    }
+}
+```
+
+### ❌ BAD: Local Media on Containers
+
+Avoid local uploads on ephemeral container deployments.
+
+Use:
+
+* S3
+* GCS
+* R2
+
+---
+
+## 8. API Design (DRF)
+
+Prefer **ViewSets + Routers** for CRUD APIs.
+
+### ✅ GOOD: ViewSet
+
+```python id="viewset"
+from rest_framework import viewsets
+
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+```
+
+### ✅ GOOD: Typed Serializer
+
+```python id="typed-serializer"
+class ProductSerializer(serializers.ModelSerializer[Product]):
+    class Meta:
+        model = Product
+        fields = ["id", "name", "price"]
+```
+
+### ❌ BAD: Repeated APIView CRUD Boilerplate
+
+Avoid separate list/detail APIViews unless behavior truly differs.
+
+---
+
+## 9. Background Jobs & Side Effects
+
+Never block request-response cycles with slow side effects.
+
+### ✅ GOOD: Queue Background Work
+
+```python id="celery"
+send_order_confirmation.delay(order.id)
+```
+
+Good background workloads:
+
+* emails
+* webhooks
+* PDF generation
+* retries
+* exports
+* analytics
+* cache warming
+
+---
+
+## 10. Type Safety
+
+Always use:
+
+* `mypy`
+* `django-stubs`
+* `djangorestframework-stubs`
+
+### ✅ GOOD: Typed QuerySets
+
+```python id="typed-queryset"
+from django.db.models import QuerySet
+
+def get_products() -> QuerySet[Product]:
+    return Product.objects.all()
+```
+
+### ✅ GOOD: mypy Plugin
+
+```python id="mypy"
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+```
+
+---
+
+## 11. Testing Standards
+
+Prefer:
+
+* `pytest`
+* `pytest-django`
+* `factory_boy`
+* `model_bakery`
+
+### ✅ GOOD: Test Workflows
+
+Focus tests on:
+
+* services
+* selectors
+* serializers
+* permissions
+* API contracts
+* transactional race conditions
+
+### ✅ GOOD: Factories
+
+```python id="factories"
+user = UserFactory()
+order = OrderFactory(user=user)
+```
+
+---
+
+## 12. Common Anti-patterns
+
+### ❌ BAD: Fat Serializers
+
+Avoid business workflows in `serializer.create()`.
+
+### ❌ BAD: Signals for Core Workflows
+
+Use signals only for decoupled side effects.
+
+### ❌ BAD: ORM Access in Templates
+
+Prevent hidden DB queries in templates.
+
+### ❌ BAD: “God Apps”
+
+Split apps by bounded context before they become monoliths.
+
+---
+
+## 13. Golden Rules
+
+* organize by domain
+* keep views thin
+* keep serializers thin
+* use services for writes
+* use selectors for reads
+* optimize ORM aggressively
+* use transactions for critical writes
+* use row locks for race conditions
+* use async ORM safely
+* never run transactions directly in async code
+* disable persistent DB connections in async mode
+* secure production defaults
+* offload side effects to workers
+* type everything
+* test workflows, not trivial fields
+
+[1]: https://docs.djangoproject.com/en/5.1/topics/async/?utm_source=chatgpt.com "Asynchronous support | Django documentation | Django"

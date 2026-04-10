@@ -1,92 +1,525 @@
 ---
-description: Best practices and conventions for Next.js applications
-globs: **/*.{jsx,tsx,js,ts}
-alwaysApply: false
+description: This guide defines definitive best practices for modern Next.js applications using the App Router, Server Components, Server Actions, caching, and performance-first architecture. Follow these rules to build robust, scalable, and maintainable Next.js projects.
+globs: **/*.{js,jsx,ts,tsx}
+---
+# next-js Best Practices
+
+This document outlines the definitive best practices for developing modern Next.js applications using the **App Router (`app/`)**, **Server Components**, **Server Actions**, **streaming**, and **explicit caching strategies**.
+
+These rules are updated for **Next.js 16+** and are designed to maximize:
+- performance
+- maintainability
+- scalability
+- DX consistency
+- long-term architectural correctness
+
 ---
 
-# Next.js Rules
+## 1. Code Organization and Structure
 
-## Router Choice
+Always use the **`app/` directory** for new projects.
 
-- Use the **App Router** (`app/`) for all new projects (Next.js 13+).
-- Keep the Pages Router (`pages/`) only in legacy projects; do not mix the two routers in the same project.
+Organize code by **feature**, not by file type.
 
-## Server vs. Client Components
+### ✅ GOOD: Feature-Driven `app/` Directory
 
-- Components in the `app/` directory are **Server Components by default** — keep them server-side unless interactivity is required.
-- Add `"use client"` only when a component needs browser APIs, React hooks, or event listeners.
-- Keep `"use client"` boundaries as **deep in the tree as possible** to maximise server rendering.
-- Never import a Client Component into a Server Component without a boundary; pass server data as props instead.
+Group all route-specific logic inside the route segment.
 
-## Data Fetching
+```tsx
+// app/dashboard/page.tsx
+export default function DashboardPage() { /* ... */ }
 
-- Fetch data directly inside Server Components using `async/await`; avoid `useEffect` for initial data loading.
-- Use `fetch` with Next.js cache options (`cache: 'force-cache'`, `next: { revalidate: N }`) instead of manual caching layers.
-- Use `React.cache` to deduplicate fetch calls across the same request.
-- Prefer **React Server Actions** for form mutations; avoid separate API routes for simple CRUD operations.
+// app/dashboard/layout.tsx
+export default function DashboardLayout({ children }) { /* ... */ }
 
-## Routing & Navigation
+// app/dashboard/loading.tsx
+export default function Loading() { /* ... */ }
 
-- Use the `<Link>` component from `next/link` for all internal navigation — never use `<a>` tags directly.
-- Use `useRouter` (from `next/navigation` in App Router) only for programmatic navigation.
-- Use dynamic segments (`[slug]`, `[...slug]`) and generate static params with `generateStaticParams`.
-- Co-locate `loading.tsx`, `error.tsx`, and `not-found.tsx` with their route segments.
+// app/dashboard/error.tsx
+export default function ErrorBoundary() { /* ... */ }
 
-## Layouts & Templates
+// app/dashboard/components/DashboardOverview.tsx
+export function DashboardOverview() { /* ... */ }
 
-- Use `layout.tsx` for persistent UI (nav, sidebars) that should not re-mount on navigation.
-- Use `template.tsx` when you need a fresh instance of the component on each navigation.
-- Share root metadata in the root `layout.tsx`; override per route with `generateMetadata`.
-
-## Images & Fonts
-
-- Always use `next/image` for images; supply `width`, `height`, and meaningful `alt` text.
-- Use `next/font` to load fonts — it eliminates external network requests and prevents layout shift.
-
-## Metadata & SEO
-
-- Export a `metadata` object or a `generateMetadata` function from every `page.tsx`.
-- Include `title`, `description`, and Open Graph tags at minimum.
-
-## API Routes (Route Handlers)
-
-- Place route handlers in `app/api/.../route.ts` following REST conventions.
-- Export named functions matching HTTP verbs (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`).
-- Return `NextResponse` objects with explicit status codes and typed JSON bodies.
-- Validate and sanitise all incoming request data before processing.
-
-## Environment Variables
-
-- Prefix public variables with `NEXT_PUBLIC_`; keep secrets server-side only.
-- Never access `process.env` inside Client Components.
-- Document all required env vars in `.env.example`.
-
-## Performance
-
-- Enable **Partial Prerendering (PPR)** for pages that mix static and dynamic content (Next.js 14+).
-- Use `React.lazy` / dynamic imports (`next/dynamic`) with `{ ssr: false }` for heavy client-only libraries.
-- Avoid large third-party scripts; load them via `next/script` with the appropriate `strategy`.
-
-## File & Folder Structure
-
+// app/dashboard/actions.ts
+'use server';
+export async function updateDashboard() { /* ... */ }
 ```
-app/
-  (group)/             # Route groups (no URL segment)
-  [param]/             # Dynamic routes
-  layout.tsx
-  page.tsx
-  loading.tsx
-  error.tsx
-components/            # Shared UI components
-lib/                   # Utilities, helpers, server-side logic
-actions/               # Server Actions
-hooks/                 # Custom client hooks
+
+### ✅ GOOD: Shared Cross-Feature Folders
+
+Use top-level shared folders only for reusable logic.
+
+```tsx
+components/
+lib/
+hooks/
 types/
 public/
 ```
 
-## Testing
+### Core Directories
 
-- Use **Vitest** or **Jest** with React Testing Library for unit/component tests.
-- Use **Playwright** or **Cypress** for end-to-end tests against a running Next.js dev or preview build.
-- Mock `next/navigation` hooks in unit tests.
+* **`app/`** → routes, layouts, route handlers, metadata, errors, loading states
+* **`components/`** → reusable UI shared across features
+* **`lib/`** → database access, APIs, auth, server utilities
+* **`hooks/`** → reusable client hooks
+* **`types/`** → shared TypeScript definitions
+* **`public/`** → static assets
+
+### ❌ BAD: Type-Driven Separation
+
+Avoid scattering feature files across unrelated global folders.
+
+```tsx
+// ❌ BAD
+app/dashboard/page.tsx
+components/dashboard/Overview.tsx
+hooks/useDashboard.ts
+```
+
+---
+
+## 2. Server Components First
+
+Always default to **Server Components**.
+
+Use Client Components only when you need:
+
+* event handlers
+* `useState`
+* `useEffect`
+* browser APIs
+* animations
+* third-party interactive UI libraries
+
+### ✅ GOOD: Server by Default
+
+```tsx
+// app/products/[id]/page.tsx
+import { getProduct } from '@/lib/products';
+import { AddToCartButton } from './components/AddToCartButton';
+
+export default async function ProductPage({ params }) {
+  const product = await getProduct(params.id);
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <AddToCartButton productId={product.id} />
+    </div>
+  );
+}
+```
+
+### ✅ GOOD: Keep `"use client"` Boundary Low
+
+```tsx
+// app/products/[id]/components/AddToCartButton.tsx
+'use client';
+
+import { useState } from 'react';
+
+export function AddToCartButton({ productId }) {
+  const [quantity, setQuantity] = useState(1);
+
+  return (
+    <button onClick={() => console.log(productId, quantity)}>
+      Add to Cart
+    </button>
+  );
+}
+```
+
+### ❌ BAD: Entire Route as Client Component
+
+```tsx
+// ❌ BAD
+'use client';
+
+export default function ProductPage() {
+  return <div>Whole page unnecessarily client-rendered</div>;
+}
+```
+
+---
+
+## 3. Data Fetching
+
+Fetch data directly in **Server Components** whenever possible.
+
+### ✅ GOOD: Parallel Server Fetching
+
+```tsx
+// app/dashboard/page.tsx
+import { getUser, getOrders } from '@/lib/api';
+
+export default async function DashboardPage() {
+  const [user, orders] = await Promise.all([
+    getUser(),
+    getOrders(),
+  ]);
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <OrderList orders={orders} />
+    </div>
+  );
+}
+```
+
+### ✅ GOOD: Explicit Fetch Cache Strategy
+
+Always define caching behavior intentionally.
+
+```tsx
+await fetch('/api/products', {
+  next: { revalidate: 300 },
+});
+```
+
+Use:
+
+* `revalidate`
+* `cache: 'no-store'`
+* `revalidateTag`
+* `revalidatePath`
+* `use cache`
+
+### ❌ BAD: Implicitly Relying on Defaults Everywhere
+
+Do not rely on default caching behavior for critical business data.
+
+---
+
+## 4. Mutations: Prefer Server Actions
+
+For internal writes, forms, and authenticated mutations, prefer **Server Actions** over Route Handlers.
+
+### ✅ GOOD: Server Action
+
+```tsx
+// app/settings/actions.ts
+'use server';
+
+export async function updateProfile(formData: FormData) {
+  const name = formData.get('name');
+  // DB write
+}
+```
+
+```tsx
+<form action={updateProfile}>
+  <button>Save</button>
+</form>
+```
+
+### ✅ GOOD: Use `route.ts` Only When Needed
+
+Use Route Handlers only for:
+
+* public APIs
+* webhooks
+* third-party callbacks
+* mobile consumers
+* external services
+
+```tsx
+// app/api/webhook/route.ts
+export async function POST(req: Request) {
+  return Response.json({ ok: true });
+}
+```
+
+### ❌ BAD: Internal Form Mutations Through REST by Default
+
+Avoid creating unnecessary internal REST endpoints for simple React form actions.
+
+---
+
+## 5. Streaming and Loading UX
+
+Always leverage **streaming** for slow route segments.
+
+### ✅ GOOD: Route Loading UI
+
+```tsx
+// app/dashboard/loading.tsx
+export default function Loading() {
+  return <div>Loading dashboard...</div>;
+}
+```
+
+### ✅ GOOD: Suspense for Slow Subtrees
+
+```tsx
+import { Suspense } from 'react';
+import { SlowAnalytics } from './components/SlowAnalytics';
+
+export default function DashboardPage() {
+  return (
+    <main>
+      <Suspense fallback={<div>Loading analytics...</div>}>
+        <SlowAnalytics />
+      </Suspense>
+    </main>
+  );
+}
+```
+
+---
+
+## 6. Performance Optimization
+
+Use built-in Next.js performance primitives.
+
+### ✅ GOOD: `next/image`
+
+```tsx
+import Image from 'next/image';
+import avatar from '@/public/avatar.jpg';
+
+export function UserAvatar() {
+  return (
+    <Image
+      src={avatar}
+      alt="Avatar"
+      width={100}
+      height={100}
+      placeholder="blur"
+    />
+  );
+}
+```
+
+### ❌ BAD: Native `<img>`
+
+```tsx
+// ❌ BAD
+<img src="/avatar.jpg" alt="Avatar" />
+```
+
+---
+
+### ✅ GOOD: `next/font`
+
+```tsx
+import { Inter } from 'next/font/google';
+
+const inter = Inter({ subsets: ['latin'] });
+```
+
+---
+
+### ✅ GOOD: Dynamic Imports for Heavy Client Components
+
+Use `dynamic()` mainly for **heavy client-side bundles**.
+
+```tsx
+import dynamic from 'next/dynamic';
+
+const HeavyChart = dynamic(() => import('./HeavyChart'), {
+  loading: () => <p>Loading chart...</p>,
+  ssr: false,
+});
+```
+
+### ✅ GOOD: Prefer Streaming for Server Slowness
+
+For server bottlenecks, use:
+
+* Suspense
+* route segmentation
+* loading states
+* partial rendering
+
+instead of dynamic import.
+
+---
+
+## 7. State Management
+
+Separate **UI state** from **server state**.
+
+### ✅ GOOD: Local UI State
+
+```tsx
+'use client';
+
+const [open, setOpen] = useState(false);
+```
+
+### ✅ GOOD: Global UI State
+
+Prefer:
+
+* Zustand
+* Jotai
+
+for shared client UI state.
+
+```tsx
+import { create } from 'zustand';
+
+export const useUIStore = create((set) => ({
+  open: false,
+  toggle: () => set((s) => ({ open: !s.open })),
+}));
+```
+
+### ✅ GOOD: Server State
+
+Prefer:
+
+* Server Components for initial fetches
+* SWR for lightweight client refresh
+* TanStack Query for complex cache synchronization
+
+### ❌ BAD: Duplicating Server Data into Client Global State
+
+Do not copy fetched server data into Zustand/Context unless truly required.
+
+---
+
+## 8. Error Handling
+
+Use dedicated route-level file conventions.
+
+### ✅ GOOD: Segment Error Boundary
+
+```tsx
+// app/dashboard/error.tsx
+'use client';
+
+export default function Error({ error, reset }) {
+  return (
+    <div>
+      <h2>Dashboard failed</h2>
+      <button onClick={() => reset()}>Retry</button>
+    </div>
+  );
+}
+```
+
+### ✅ GOOD: Global Error Boundary
+
+```tsx
+// app/global-error.tsx
+'use client';
+
+export default function GlobalError() {
+  return (
+    <html>
+      <body>Something went wrong</body>
+    </html>
+  );
+}
+```
+
+### ✅ GOOD: Route Special Files
+
+Use when appropriate:
+
+* `not-found.tsx`
+* `forbidden.tsx`
+* `unauthorized.tsx`
+
+---
+
+## 9. Navigation
+
+Always use **`Link`** for internal navigation.
+
+### ✅ GOOD
+
+```tsx
+import Link from 'next/link';
+
+<Link href="/dashboard">Dashboard</Link>
+```
+
+### ❌ BAD
+
+```tsx
+<a href="/dashboard">Dashboard</a>
+```
+
+---
+
+## 10. ESLint and Type Safety
+
+Always enable:
+
+* `eslint-config-next/core-web-vitals`
+* TypeScript strict mode
+* flat config setup
+
+### ✅ GOOD
+
+```tsx
+// eslint.config.mjs
+import { defineConfig } from 'eslint/config';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTs from 'eslint-config-next/typescript';
+
+export default defineConfig([
+  ...nextVitals,
+  ...nextTs,
+]);
+```
+
+---
+
+## 11. Common Pitfalls and Anti-patterns
+
+### ❌ BAD: Async Client Components
+
+```tsx
+'use client';
+
+// ❌ BAD
+export default async function ClientComponent() {
+  return <div />;
+}
+```
+
+### ✅ GOOD: Use SWR / Query on Client
+
+```tsx
+'use client';
+import useSWR from 'swr';
+
+export default function ClientData() {
+  const { data } = useSWR('/api/user', fetcher);
+  return <div>{data?.name}</div>;
+}
+```
+
+### ❌ BAD: Top-Level Client Layouts
+
+Avoid making root layouts client-side unless absolutely necessary.
+
+### ❌ BAD: Fetching Same Data on Server and Client
+
+Avoid duplicate waterfalls caused by repeated fetching.
+
+### ❌ BAD: Context for Frequently Changing Server Data
+
+Prefer dedicated server-state libraries.
+
+---
+
+## 12. Golden Rules
+
+* default to Server Components
+* use Server Actions for writes
+* colocate by feature
+* cache intentionally
+* stream aggressively
+* keep client boundaries tiny
+* use built-in Next.js primitives first
+* separate UI state from server state
+* avoid REST for internal mutations
+* optimize perceived performance, not just raw benchmarks
+

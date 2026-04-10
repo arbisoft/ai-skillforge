@@ -1,0 +1,439 @@
+---
+alwaysApply: true
+---
+---
+description: Definitive best practices for writing robust, maintainable, and performant Pydantic v2.12+ models in Python.
+globs: **/*.py
+---
+# Pydantic Best Practices
+
+This guide defines the non-negotiable standards for building modern, type-safe, high-performance validation layers using Pydantic v2.12+.
+
+Pydantic models are **contracts**, not business-logic containers.
+
+Use them for:
+- validation
+- serialization
+- settings
+- API schemas
+- typed contracts
+- LLM structured outputs
+- persistence boundaries
+
+---
+
+## 1. Model Naming and Organization
+
+Use clear, singular nouns.
+
+Store models in dedicated modules by domain.
+
+❌ **BAD**
+```python
+class UserData(BaseModel):
+    ...
+```
+
+✅ **GOOD**
+
+```python
+# models/user.py
+from pydantic import BaseModel, EmailStr
+
+class User(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+```
+
+Rules:
+
+* singular model names
+* domain-based modules
+* avoid duplicate schema names
+* request/response variants should be explicit (`UserCreate`, `UserRead`)
+
+---
+
+## 2. Strictness First
+
+By default, Pydantic coerces values.
+
+For production systems, prefer **strict validation by default**. ([Pydantic Docs][1])
+
+✅ **GOOD**
+
+```python
+from pydantic import BaseModel, ConfigDict
+
+class Item(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    quantity: int
+    price: float
+```
+
+Use field-level strict types only when selective strictness is needed.
+
+```python
+from pydantic import StrictInt, StrictFloat
+
+quantity: StrictInt
+price: StrictFloat
+```
+
+### Mutability Rules
+
+Immutable models are preferred.
+
+```python
+model_config = ConfigDict(frozen=True)
+```
+
+Use mutable models only when state updates are intentional:
+
+```python
+model_config = ConfigDict(validate_assignment=True)
+```
+
+---
+
+## 3. Prefer `Annotated` + `Field`
+
+Modern Pydantic strongly benefits from `Annotated`.
+
+✅ **GOOD**
+
+```python
+from typing import Annotated
+from pydantic import BaseModel, Field
+
+class Product(BaseModel):
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    price: Annotated[float, Field(gt=0)]
+```
+
+This improves:
+
+* readability
+* schema reuse
+* FastAPI/OpenAPI interoperability
+* type checker support
+
+---
+
+## 4. Safe Defaults
+
+Never use mutable direct defaults.
+
+Official docs strongly recommend `default_factory`. ([Pydantic][2])
+
+❌ **BAD**
+
+```python
+tags: list[str] = []
+```
+
+✅ **GOOD**
+
+```python
+from pydantic import Field
+
+tags: list[str] = Field(default_factory=list)
+metadata: dict[str, str] = Field(default_factory=dict)
+```
+
+### Advanced Factory Pattern
+
+Factories may safely depend on validated prior fields. ([Pydantic][2])
+
+```python
+username: str = Field(default_factory=lambda data: data["email"])
+```
+
+Use this sparingly.
+
+Never perform:
+
+* DB calls
+* HTTP requests
+* filesystem reads
+
+inside `default_factory`.
+
+---
+
+## 5. Validation Rules
+
+Use:
+
+* `@field_validator` → single field
+* `@model_validator` → cross-field logic
+
+✅ **GOOD**
+
+```python
+from pydantic import BaseModel, field_validator, model_validator
+from typing import Self
+
+class Event(BaseModel):
+    start: int
+    end: int
+
+    @field_validator("start")
+    @classmethod
+    def positive(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("Must be positive")
+        return value
+
+    @model_validator(mode="after")
+    def validate_order(self) -> Self:
+        if self.start >= self.end:
+            raise ValueError("start must be before end")
+        return self
+```
+
+Rules:
+
+* keep validators deterministic
+* no network I/O
+* no DB access
+* no side effects
+* business workflows belong in services
+
+---
+
+## 6. Serialization Standards
+
+Always serialize with `model_dump()`.
+
+Never use deprecated `.dict()`.
+
+✅ **GOOD**
+
+```python
+payload = user.model_dump()
+payload_public = user.model_dump(exclude_none=True)
+```
+
+### Aliases
+
+For API compatibility:
+
+```python
+from pydantic import Field
+
+user_id: int = Field(serialization_alias="userId")
+```
+
+Use aliases for:
+
+* camelCase APIs
+* legacy contracts
+* external providers
+
+---
+
+## 7. Computed Fields and Serializers
+
+Prefer official computed fields over ad hoc properties.
+
+✅ **GOOD**
+
+```python
+from pydantic import BaseModel, computed_field
+
+class Cart(BaseModel):
+    quantity: int
+    price: float
+
+    @computed_field
+    @property
+    def total(self) -> float:
+        return self.quantity * self.price
+```
+
+For custom output formatting, use serializers.
+
+```python
+from datetime import datetime
+from pydantic import field_serializer
+```
+
+Use serializers for:
+
+* datetime formatting
+* Decimal normalization
+* enum flattening
+* API compatibility layers
+
+---
+
+## 8. Settings Management
+
+Application configuration must use `pydantic-settings`. ([Pydantic Docs][3])
+
+✅ **GOOD**
+
+```python
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="APP_",
+        extra="ignore",
+    )
+
+    api_key: SecretStr
+    database_url: str
+```
+
+Rules:
+
+* use `SecretStr` for secrets
+* prefer `env_prefix`
+* `.env` only for local development
+* production should use real environment injection
+* nested settings should use `_env_nested_delimiter`
+
+---
+
+## 9. Performance Rules
+
+For repeated validation of non-model types, use `TypeAdapter`.
+
+✅ **GOOD**
+
+```python
+from pydantic import TypeAdapter
+
+user_list_adapter = TypeAdapter(list[User])
+users = user_list_adapter.validate_python(raw_users)
+```
+
+This is preferred over temporary wrapper models.
+
+For deeply nested models:
+
+* flatten unnecessary nesting
+* validate once at boundaries
+* avoid repeated re-validation
+* reuse adapters
+
+---
+
+## 10. Protected Namespace Pitfalls
+
+Pydantic protects internal method namespaces. ([Pydantic Docs][1])
+
+Avoid fields like:
+
+❌ **BAD**
+
+```python
+model_dump_data: str
+model_validate_result: str
+```
+
+✅ **GOOD**
+
+```python
+dumped_data: str
+validated_result: str
+```
+
+Avoid collisions with:
+
+* `model_`
+* `__pydantic_`
+* builtins
+* Python keywords
+
+---
+
+## 11. Generic Schema Reuse
+
+For reusable envelopes, use generics.
+
+✅ **GOOD**
+
+```python
+from typing import Generic, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+class APIResponse(BaseModel, Generic[T]):
+    data: T
+    success: bool = True
+```
+
+Use for:
+
+* pagination
+* API envelopes
+* result wrappers
+* typed LLM tool outputs
+
+---
+
+## 12. IDE + Static Analysis Standards
+
+Mandatory tooling:
+
+* Pyright strict
+* mypy
+* Ruff
+* pytest
+* hypothesis
+
+Preferred VS Code:
+
+```json
+{
+  "python.analysis.typeCheckingMode": "strict"
+}
+```
+
+Do not “fix” Pylance warnings with fake casts.
+
+❌ **BAD**
+
+```python
+cast(int, "23")
+```
+
+Instead:
+
+* validate external input at boundaries
+* use strict models
+* use explicit parsing helpers
+
+---
+
+## 13. When Not to Use Pydantic
+
+Avoid Pydantic for:
+
+* internal hot loops
+* raw numeric kernels
+* huge ETL row-by-row transforms
+* ORM entities themselves
+* DB session objects
+
+Use plain dataclasses or TypedDicts where validation is unnecessary.
+
+Pydantic belongs at:
+
+* API boundaries
+* queue payloads
+* config loading
+* LLM IO contracts
+* persistence serialization boundaries
+
+[1]: https://docs.pydantic.dev/latest/api/config/?utm_source=chatgpt.com "Configuration - Pydantic Validation"
+[2]: https://pydantic.dev/docs/validation/latest/concepts/fields/?utm_source=chatgpt.com "Fields | Pydantic Docs"
+[3]: https://docs.pydantic.dev/latest/api/pydantic_settings/?utm_source=chatgpt.com "Pydantic Settings - Pydantic Validation"

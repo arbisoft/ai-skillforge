@@ -1,81 +1,204 @@
 ---
-description: Best practices and conventions for React applications
+alwaysApply: true
+---
+---
+description: Definitive guidelines for writing idiomatic, maintainable, and performant React applications using modern best practices and TypeScript — fully fact‑checked against React official docs and established community patterns.
 globs: **/*.{jsx,tsx}
-alwaysApply: false
+---
+# react Best Practices
+
+This guide defines the **non‑negotiable standards** for building modern React applications. It reflects official React principles (e.g., Rules of React/Hooks) and widely accepted best practices in performance, code organization, state management, accessibility, and testing.
+
 ---
 
-# React Rules
+## 1. Core React Principles: Purity & Rules of Hooks
 
-## Component Design
+React components and Hooks **must be pure and follow the Rules of Hooks**. Components should always produce the same output for the same inputs, without side effects during rendering. React’s official documentation specifies these rules as essential for predictable behavior and maintainability. :contentReference[oaicite:0]{index=0}
 
-- Use **functional components** exclusively; avoid class components.
-- Keep components small and focused on a single responsibility.
-- Co-locate component files with their styles and tests.
-- Use named exports for components; reserve default exports for page-level components.
+### ❌ BAD: Impure components / violating Hooks rules
 
-## Hooks
+```tsx
+function ProductList({ products }) {
+  // ❌ Mutating props during render
+  products.sort((a, b) => a.name.localeCompare(b.name));
+  return /* ... */;
+}
 
-- Call hooks only at the top level — never inside loops, conditions, or nested functions.
-- Use `useState` for local UI state; lift state up only when siblings need it.
-- Use `useEffect` for side effects; always specify a dependency array.
-- Clean up subscriptions, timers, and event listeners in the `useEffect` return function.
-- Extract reusable stateful logic into custom hooks (`use` prefix required).
-- Prefer `useReducer` over multiple related `useState` calls for complex state.
-- Use `useMemo` to memoize expensive computations; use `useCallback` to stabilize function references passed as props.
+function MyComponent() {
+  // ❌ Hook called conditionally
+  if (Math.random() > 0.5) {
+    const [count, setCount] = useState(0); 
+  }
+  return /* ... */;
+}
+```
 
-## Props & Types
+### ✅ GOOD: Pure components / correct hook usage
 
-- Define prop types with **TypeScript interfaces**; avoid `any`.
-- Mark optional props explicitly with `?`.
-- Destructure props at the function signature level.
-- Use `React.FC<Props>` sparingly — prefer plain function signatures with typed parameters.
-- Pass only the props a component needs; avoid prop drilling more than two levels deep (use Context or a state manager instead).
+```tsx
+import { useMemo, useState } from 'react';
 
-## Performance
+function ProductList({ products }) {
+  const sortedProducts = useMemo(
+    () => [...products].sort((a, b) => a.name.localeCompare(b.name)),
+    [products]
+  );
+  return /* ... */;
+}
 
-- Wrap pure child components with `React.memo` to prevent unnecessary re-renders.
-- Use `React.lazy` + `Suspense` for code-splitting route-level and heavy components.
-- Avoid creating objects or functions inline inside JSX when they are used as props for memoized children.
-- Use the **React DevTools Profiler** to identify and fix performance bottlenecks before optimising speculatively.
+function MyComponent() {
+  const [count, setCount] = useState(0);
+  return /* ... */;
+}
+```
 
-## State Management
+---
 
-- Use React Context for low-frequency global state (theme, locale, auth user).
-- Use Zustand, Redux Toolkit, or Jotai for high-frequency or complex shared state.
-- Keep derived data out of state — compute it from existing state during render or with `useMemo`.
+## 2. Code Organization & Naming
 
-## Styling
+Organize code by **feature modules**, not by type. One component per file (except closely related small stateless pieces). Naming conventions:
 
-- Prefer CSS Modules or a CSS-in-JS library (e.g., styled-components, Emotion) for component-scoped styles.
-- Avoid inline `style` objects for anything beyond truly dynamic values.
+* Components: `PascalCase`
+* Custom Hooks: `useXxx` (PascalCase after `use`)
+* Functions/variables: `camelCase`
+* CSS class names: `kebab-case`
 
-## Event Handling
-
-- Name event handler props `onX` (e.g., `onClick`, `onChange`).
-- Name handler implementations `handleX` inside the component.
-
-## Accessibility
-
-- Use semantic HTML elements (`<button>`, `<nav>`, `<main>`, etc.) instead of styled `<div>` wrappers.
-- Always provide meaningful `alt` text for `<img>` elements.
-- Ensure interactive elements are keyboard-navigable.
-- Use `aria-*` attributes only when native semantics are insufficient.
-
-## File & Folder Structure
+Example (feature‑based structure):
 
 ```
 src/
-  components/        # Shared/reusable components
-  features/          # Feature-scoped components, hooks, slices
-  hooks/             # Global custom hooks
-  pages/ (or routes/)
-  utils/
-  types/
+├── features/
+│   ├── auth/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   └── api/
+├── components/ui/ // reusable UI
+└── App.tsx
 ```
 
-## Testing
+Clear structure improves maintainability and discoverability.
 
-- Test behaviour, not implementation details.
-- Use **React Testing Library** with `userEvent` for interaction tests.
-- Mock external dependencies (API calls, context) at the module level.
-- Write at least one test per component covering its primary use case.
+---
+
+## 3. Component Design & Patterns
+
+Prefer **function components with Hooks**. Avoid class components unless interoperability with legacy code is required. Split logic and UI:
+
+* “Smart” components handle data and state
+* “Dumb” components focus on presentation
+
+This pattern improves testability and separation of concerns.
+
+---
+
+## 4. State Management
+
+Use local Hooks (`useState`, `useReducer`) first. Lift state up only when necessary. For global state that changes infrequently, the **Context API** is appropriate. For more complex global state, use libraries like **Zustand, Jotai**, or **Redux Toolkit**. Avoid deep prop drilling. ([rtCamp][1])
+
+---
+
+## 5. Performance & Optimization
+
+React creates new objects/functions on every render. Excessive, unnecessary re‑renders hurt performance. Memoization tools (`React.memo`, `useMemo`, `useCallback`) **reduce re‑renders only when necessary** — but they add complexity and should be used *after profiling confirms a problem*. ([Boundev][2])
+
+### ❌ BAD: Premature or incorrect memoization
+
+```tsx
+// ❌ Every component memoized even when not expensive
+const MyButton = React.memo(({ onClick }) => <button onClick={onClick}>Click</button>);
+```
+
+### ✅ GOOD: Targeted optimization
+
+```tsx
+const ExpensiveList = React.memo(({ items }) => <>{/* heavy UI */}</>);
+const handleClick = useCallback(() => setCount(c => c + 1), []);
+```
+
+Use profiling tools like **React DevTools Profiler** to identify bottlenecks before optimizing. ([Boundev][2])
+
+---
+
+## 6. Immutability & Side Effects
+
+Always treat props and state as immutable during render. Side effects must occur inside `useEffect` or other effect Hooks — never in the main render body.
+
+* Never mutate props
+* Never mutate state directly
+* Always return JSX from components, not call them as functions
+
+---
+
+## 7. Accessibility (A11y)
+
+Build accessibility into UI from the start:
+
+* Use **semantic HTML** (`<button>`, `<main>`, `<nav>`)
+* Add appropriate **ARIA attributes** when needed
+* Ensure components are **keyboard navigable**
+* Use `role` and `aria-*` only when semantic HTML doesn’t suffice
+
+This improves usability for users with assistive technologies.
+
+---
+
+## 8. Testing Strategy
+
+Use **React Testing Library (RTL)** to test component behavior the way users interact with it — not internal implementation details.
+
+### ❌ BAD: Implementation‑specific testing
+
+```tsx
+// ❌ Accessing instance or internal state
+expect(component.state.count).toBe(1);
+```
+
+### ✅ GOOD: User‑centric testing
+
+```tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+
+render(<MyButton />);
+fireEvent.click(screen.getByRole('button', { name: /click me/i }));
+```
+
+Testing user output and behavior instead of internal state improves resiliency of tests.
+
+---
+
+## 9. Accessibility in Tests
+
+Use RTL queries like `getByRole`, `getByLabelText`, etc., to assert behavior in an accessible way. These utilities mirror how real users interact with UI elements.
+
+---
+
+## 10. Performance Measurement Tools
+
+Use **React DevTools Profiler**, Chrome Performance tab, and other metrics to identify slow renders, wasted re‑renders, and memory issues before applying optimizations.
+
+---
+
+## Common Pitfalls & Anti‑Patterns
+
+* **Mutating props** — never change props or state values during render.
+* **Calling components as functions** — always use JSX.
+* **Missing effect clean‑ups** — always return clean‑up functions inside `useEffect`.
+* **Incorrect Hook dependency arrays** — missing entries cause stale values; extra entries cause unnecessary re‑runs.
+
+React strongly enforces the Rules of Hooks and purity to make functional components predictable and reliable — breaking these rules often leads to bugs that are hard to debug. ([React][3])
+
+---
+
+## Summary of Key Rules
+
+* Follow the Rules of React and React Hooks. ([React][3])
+* Organize code by feature and responsibility.
+* Prefer function components and custom hooks.
+* Lift state up judiciously; use Context for shared state. ([rtCamp][1])
+* Optimize performance only after profiling confirms an issue. ([Boundev][2])
+* Use accessibility best practices and semantic HTML.
+* Write user‑centric tests with React Testing Library.
+
+[1]: https://rtcamp.com/handbook/react-best-practices/hooks/?utm_source=chatgpt.com "React Hooks Best Practices | rtCamp"
+[2]: https://www.boundev.com/blog/react-memoization-performance-guide?utm_source=chatgpt.com "React Memoization: useMemo, useCallback & Memo"
+[3]: https://react.dev/reference/rules?utm_source=chatgpt.com "Rules of React – React"

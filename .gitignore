@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cursor local config (keep rules, ignore local settings)
+.cursor/
+
+# Logs
+*.log
+
+# OS-generated
+Thumbs.db
+ehthumbs.db

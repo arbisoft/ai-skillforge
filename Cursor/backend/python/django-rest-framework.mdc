@@ -1,0 +1,522 @@
+---
+description: Enforces modern, secure, performant, async-aware, and schema-first django-rest-framework best practices for scalable API development using DRF 3.16+, typed serializers, ViewSets, throttling, and production-safe patterns.
+globs: **/*.py
+---
+# django-rest-framework Best Practices
+
+This guide defines the definitive best practices for building **modern DRF APIs** with strong maintainability, security, scalability, performance, and type safety.
+
+These rules align with:
+
+- DRF 3.16+
+- Django 5/6
+- OpenAPI-first design
+- typed serializers
+- optimized querysets
+- schema-driven APIs
+- throttling + pagination
+- async-safe integrations
+- production observability
+
+---
+
+## 1. API Architecture & Project Structure
+
+Prefer **domain-driven API boundaries**, not a single giant `api/` dumping ground.
+
+### ✅ GOOD: Domain-Scoped APIs
+
+Each domain app should own its API layer.
+
+```python
+apps/products/
+├── models.py
+├── selectors.py
+├── services.py
+├── api/
+│   ├── serializers.py
+│   ├── views.py
+│   ├── permissions.py
+│   ├── filters.py
+│   └── urls.py
+└── tests/
+```
+
+### ✅ GOOD: Project-Level Router Aggregation
+
+```python id="router-root"
+# src/config/api_urls.py
+from django.urls import include, path
+
+urlpatterns = [
+    path("products/", include("apps.products.api.urls")),
+    path("orders/", include("apps.orders.api.urls")),
+]
+```
+
+### ❌ BAD: Single Massive `api/views.py`
+
+Avoid global API files that mix unrelated domains.
+
+---
+
+## 2. Global DRF Settings
+
+Centralize DRF configuration.
+
+### ✅ GOOD: Typed, Secure Defaults
+
+```python id="drf-settings"
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.OrderingFilter",
+        "rest_framework.filters.SearchFilter",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/day",
+    },
+}
+```
+
+### ✅ GOOD: OpenAPI Endpoints
+
+```python id="schema-urls"
+urlpatterns = [
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/schema/swagger/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+]
+```
+
+### ❌ BAD: No Schema Strategy
+
+Every production API should expose OpenAPI schema.
+
+---
+
+## 3. Serializers: Thin, Typed, Explicit
+
+Prefer:
+
+* `ModelSerializer` for CRUD
+* `Serializer` for workflow inputs
+* nested serializers only when justified
+* selector-optimized reads
+
+### ✅ GOOD: Typed ModelSerializer
+
+```python id="serializer"
+from rest_framework import serializers
+
+class CategorySerializer(serializers.ModelSerializer[Category]):
+    class Meta:
+        model = Category
+        fields = ["id", "name"]
+```
+
+### ✅ GOOD: Nested Read Serializer
+
+```python id="nested"
+class ProductSerializer(serializers.ModelSerializer[Product]):
+    category = CategorySerializer(read_only=True)
+
+    class Meta:
+        model = Product
+        fields = ["id", "name", "price", "category"]
+```
+
+### ✅ GOOD: Input Serializer for Workflow Actions
+
+```python id="input"
+class AddReviewSerializer(serializers.Serializer):
+    text = serializers.CharField()
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+```
+
+### ❌ BAD: Business Logic in Serializers
+
+Avoid placing multi-step workflows in:
+
+* `create()`
+* `update()`
+* `validate()`
+
+Use service layer instead.
+
+---
+
+## 4. ViewSets & Routers
+
+Prefer:
+
+* `ModelViewSet` → full CRUD
+* `ReadOnlyModelViewSet` → read resources
+* `GenericViewSet` + mixins → partial workflows
+
+### ✅ GOOD: Optimized ViewSet
+
+```python id="viewset"
+from rest_framework import viewsets
+
+class ProductViewSet(viewsets.ModelViewSet):
+    serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        return (
+            Product.objects
+            .select_related("category")
+            .prefetch_related("reviews__user")
+        )
+```
+
+### ✅ GOOD: Action-Specific Serializers
+
+```python id="action-serializer"
+def get_serializer_class(self):
+    if self.action == "add_review":
+        return AddReviewSerializer
+    return ProductSerializer
+```
+
+### ✅ GOOD: Custom Actions
+
+```python id="custom-action"
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+@action(detail=True, methods=["post"])
+def archive(self, request, pk=None):
+    archive_product(product_id=pk)
+    return Response({"status": "archived"})
+```
+
+### ❌ BAD: Repetitive APIView CRUD
+
+Avoid writing list/create/retrieve/update/delete manually unless behavior diverges significantly.
+
+---
+
+## 5. Permissions & Authentication
+
+Always default to authenticated APIs.
+
+### ✅ GOOD: JWT Authentication
+
+Prefer:
+
+* SimpleJWT
+* rotating refresh tokens
+* short access tokens
+
+### ✅ GOOD: Object-Level Permission
+
+```python id="permission"
+from rest_framework.permissions import BasePermission, SAFE_METHODS
+
+class IsOwnerOrReadOnly(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return obj.owner_id == request.user.id
+```
+
+### ✅ GOOD: Per-Action Permissions
+
+```python id="per-action"
+def get_permissions(self):
+    if self.action == "list":
+        return [AllowAny()]
+    return [IsAuthenticated()]
+```
+
+### ❌ BAD: Blanket `AllowAny`
+
+Use `AllowAny` only for truly public endpoints.
+
+---
+
+## 6. Query Performance
+
+DRF performance depends heavily on queryset discipline.
+
+### ✅ GOOD: Prevent N+1
+
+```python id="nplus1"
+def get_queryset(self):
+    return (
+        Product.objects
+        .select_related("category")
+        .prefetch_related("reviews__user")
+    )
+```
+
+### ✅ GOOD: Optimize by Action
+
+```python id="by-action"
+def get_queryset(self):
+    qs = Product.objects.all()
+
+    if self.action == "list":
+        return qs.select_related("category")
+
+    return qs.prefetch_related("reviews__user")
+```
+
+### ❌ BAD: Querying in SerializerMethodField
+
+Avoid ORM access inside serializer methods unless preloaded.
+
+---
+
+## 7. Filtering, Search, Ordering, Pagination
+
+Always support scalable list endpoints.
+
+### ✅ GOOD: FilterSet
+
+```python id="filterset"
+import django_filters
+
+class ProductFilter(django_filters.FilterSet):
+    min_price = django_filters.NumberFilter(
+        field_name="price",
+        lookup_expr="gte",
+    )
+
+    class Meta:
+        model = Product
+        fields = ["category", "is_active"]
+```
+
+### ✅ GOOD: Cursor Pagination for Large Feeds
+
+Prefer cursor pagination for:
+
+* timelines
+* activity feeds
+* logs
+* audit events
+
+```python id="cursor"
+class FeedPagination(CursorPagination):
+    ordering = "-created_at"
+    page_size = 50
+```
+
+### ❌ BAD: Unbounded List Endpoints
+
+Never expose full-table list responses.
+
+---
+
+## 8. Error Handling
+
+Always return consistent machine-readable errors.
+
+### ✅ GOOD: Custom Exception Handler
+
+```python id="exceptions"
+from rest_framework.views import exception_handler
+from rest_framework.response import Response
+from rest_framework import status
+
+def api_exception_handler(exc, context):
+    response = exception_handler(exc, context)
+
+    if response is not None:
+        response.data = {
+            "error": response.data,
+            "status_code": response.status_code,
+        }
+        return response
+
+    return Response(
+        {"error": "Unexpected server error"},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+```
+
+### ✅ GOOD: Problem Details Style
+
+Prefer stable error shapes for frontend clients.
+
+---
+
+## 9. Throttling & Abuse Protection
+
+Always throttle public or user-generated endpoints.
+
+### ✅ GOOD: Login/Register Burst Protection
+
+```python id="throttle"
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "anon": "100/day",
+    "user": "1000/day",
+    "login": "10/min",
+}
+```
+
+```python id="scope"
+throttle_scope = "login"
+```
+
+Use stricter throttles for:
+
+* login
+* password reset
+* OTP
+* search
+* AI endpoints
+* exports
+
+---
+
+## 10. Async & External IO
+
+DRF async support is still limited compared with core Django.
+
+### ✅ GOOD: Async for External IO Only
+
+Use async views mainly for:
+
+* external HTTP calls
+* async cache
+* websockets handoff
+* concurrent API aggregation
+
+```python id="async"
+class AsyncExternalView(APIView):
+    async def get(self, request):
+        async with httpx.AsyncClient() as client:
+            response = await client.get("https://api.example.com/data")
+        return Response(response.json())
+```
+
+### ⚠️ HARD RULE: No Sync ORM in Async Views
+
+Never call sync ORM directly inside async DRF views.
+
+Use:
+
+* async ORM methods
+* `sync_to_async(..., thread_sensitive=True)`
+
+### ❌ BAD: Async for Normal CRUD
+
+Standard CRUD ViewSets should remain sync unless real IO concurrency is required.
+
+---
+
+## 11. Versioning Strategy
+
+Always version public APIs.
+
+### ✅ GOOD: URL Versioning
+
+```python id="versioning"
+path("api/v1/", include("src.config.api_urls"))
+```
+
+Recommended strategy:
+
+* `/api/v1/`
+* `/api/v2/`
+
+Avoid breaking existing clients silently.
+
+---
+
+## 12. Testing Standards
+
+Use:
+
+* `pytest`
+* `pytest-django`
+* `APIClient`
+* factories
+* schema contract tests
+
+### ✅ GOOD: API Contract Testing
+
+Test:
+
+* status codes
+* auth failures
+* permissions
+* throttling
+* pagination shape
+* filtering
+* OpenAPI schema
+* error contracts
+
+### ✅ GOOD: Factory Usage
+
+```python id="api-test"
+response = api_client.get("/api/v1/products/")
+assert response.status_code == 200
+```
+
+---
+
+## 13. Type Safety
+
+Always use:
+
+* `mypy`
+* `django-stubs`
+* `djangorestframework-stubs`
+
+### ✅ GOOD: Typed QuerySets
+
+```python id="typed"
+from django.db.models import QuerySet
+
+def get_queryset(self) -> QuerySet[Product]:
+    return Product.objects.all()
+```
+
+### ✅ GOOD: Typed Serializer Return
+
+```python id="typed-create"
+def create(self, validated_data: dict) -> Product:
+    return Product.objects.create(**validated_data)
+```
+
+---
+
+## 14. Golden Rules
+
+* organize APIs by domain
+* keep serializers thin
+* keep ViewSets focused
+* optimize querysets aggressively
+* use action-specific serializers
+* use object permissions
+* throttle sensitive endpoints
+* paginate every list
+* expose OpenAPI schema
+* standardize error contracts
+* use async only for real IO concurrency
+* version public APIs
+* type serializers and querysets
+
+```
+```

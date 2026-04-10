@@ -1,0 +1,390 @@
+---
+description: Definitive best practices for building robust, maintainable, and modern REST APIs using Flask-RESTful with Pydantic v2, service-layer architecture, and production-ready API standards.
+globs: **/*.py
+---
+# Flask-RESTful Best Practices
+
+This guide defines the non-negotiable standards for building scalable and maintainable REST APIs using Flask-RESTful in modern Python applications.
+
+Flask-RESTful should be treated as a **thin HTTP resource routing layer**, while validation, serialization, business logic, and persistence must live elsewhere.
+
+---
+
+## 1. Architecture: Application Factory + Blueprints + Versioning
+
+Always use:
+
+- Flask application factory
+- Blueprint-scoped API modules
+- explicit API versioning
+- service layer separation
+- schema layer separation
+
+Official Flask app factories remain the recommended production structure. :contentReference[oaicite:4]{index=4}
+
+✅ **GOOD**
+```python
+# app/__init__.py
+from flask import Flask
+from .api import api_bp
+from .errors import register_error_handlers
+
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.register_blueprint(api_bp, url_prefix="/api")
+    register_error_handlers(app)
+    return app
+```
+
+```python
+# app/api/__init__.py
+from flask import Blueprint
+from flask_restful import Api
+
+api_bp = Blueprint("api", __name__)
+api = Api(api_bp)
+
+from .v1 import register_v1_resources
+register_v1_resources(api)
+```
+
+```python
+# app/api/v1/__init__.py
+from flask_restful import Api
+
+def register_v1_resources(api: Api) -> None:
+    from .resources import UserListResource, UserResource
+
+    api.add_resource(UserListResource, "/v1/users")
+    api.add_resource(UserResource, "/v1/users/<int:user_id>")
+```
+
+---
+
+## 2. Validation: Never Use `reqparse`
+
+`flask_restful.reqparse` is effectively deprecated and slated for removal. ([Stack Overflow][3])
+
+❌ **BAD**
+
+```python
+from flask_restful import reqparse
+```
+
+Use **Pydantic v2** for:
+
+* request validation
+* response serialization
+* strict types
+* schema reuse
+* OpenAPI compatibility
+* testability
+
+---
+
+## 3. Pydantic v2 Standard
+
+Your original file used deprecated Pydantic v1 APIs.
+
+Modern code must use **v2 syntax only**. ([Pydantic][4])
+
+✅ **GOOD**
+
+```python
+# app/schemas.py
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+class UserCreateSchema(BaseModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+
+class UserResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    email: EmailStr
+    is_active: bool = True
+```
+
+### Mandatory Pydantic v2 Rules
+
+Use:
+
+* `model_validate()`
+* `model_dump()`
+* `model_config`
+* `field_validator`
+
+Never use:
+
+* `parse_obj()`
+* `.dict()`
+* `from_orm()`
+* `class Config`
+* `@validator`
+
+---
+
+## 4. Resource Layer = HTTP Only
+
+Resources must only handle:
+
+* HTTP verbs
+* status codes
+* request extraction
+* response formatting
+* auth decorators
+
+Never place:
+
+* DB queries
+* business rules
+* cross-resource workflows
+* external integrations
+* caching logic
+
+inside Resource methods.
+
+✅ **GOOD**
+
+```python
+# app/api/v1/resources.py
+from flask import request
+from flask_restful import Resource
+from app.schemas import UserCreateSchema, UserResponseSchema
+from app.services.user_service import UserService
+
+class UserListResource(Resource):
+    def post(self):
+        payload = UserCreateSchema.model_validate(request.get_json())
+
+        user = UserService.create_user(payload)
+
+        return UserResponseSchema.model_validate(user).model_dump(), 201
+```
+
+---
+
+## 5. Service Layer Is Mandatory
+
+All business logic belongs in services.
+
+✅ **GOOD**
+
+```python
+# app/services/user_service.py
+from app.schemas import UserCreateSchema
+from app.models import User
+from app.extensions import db
+
+class UserService:
+    @staticmethod
+    def create_user(payload: UserCreateSchema) -> User:
+        user = User(name=payload.name, email=payload.email)
+        db.session.add(user)
+        db.session.commit()
+        return user
+```
+
+Rules:
+
+* resources = transport
+* services = business rules
+* repositories = persistence
+* schemas = validation
+* models = ORM only
+
+---
+
+## 6. Error Handling: Unified JSON Responses
+
+Centralize all exceptions.
+
+✅ **GOOD**
+
+```python
+# app/errors.py
+from flask import Flask
+from pydantic import ValidationError
+
+def register_error_handlers(app: Flask) -> None:
+    @app.errorhandler(ValidationError)
+    def handle_validation_error(error):
+        return {
+            "error": "Validation failed",
+            "details": error.errors(),
+        }, 422
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return {"error": "Not found"}, 404
+
+    @app.errorhandler(Exception)
+    def internal(error):
+        app.logger.exception("Unhandled API exception")
+        return {"error": "Internal server error"}, 500
+```
+
+Rules:
+
+* always JSON
+* never raw HTML errors
+* never expose stack traces
+* include machine-readable error payloads
+
+---
+
+## 7. Pagination Is Required
+
+Never return unbounded collections.
+
+✅ **GOOD**
+
+```python
+class UserListQuery(BaseModel):
+    page: int = 1
+    per_page: int = 20
+```
+
+```python
+query = UserListQuery.model_validate(request.args)
+```
+
+Rules:
+
+* default page size
+* max page size
+* total count metadata
+* cursor pagination for high-scale APIs
+
+---
+
+## 8. Security Standards
+
+Mandatory:
+
+* JWT or session auth
+* rate limiting
+* strict validation
+* CORS policy
+* HTTPS only
+* secure headers
+* request size limits
+* ORM parameterization
+* auth decorators per resource
+
+Recommended:
+
+* Flask-Limiter
+* Authlib
+* Flask-JWT-Extended
+
+---
+
+## 9. Response Standards
+
+Always return:
+
+* resource objects
+* collection envelopes
+* pagination metadata
+* typed errors
+* stable field names
+
+✅ **GOOD**
+
+```python
+return {
+    "items": serialized_users,
+    "page": page,
+    "per_page": per_page,
+    "total": total,
+}, 200
+```
+
+Avoid inconsistent response shapes.
+
+---
+
+## 10. Versioning Strategy
+
+All APIs must be versioned.
+
+Required:
+
+* `/api/v1`
+* `/api/v2`
+
+Never expose unversioned public APIs.
+
+Blueprint-per-version is preferred.
+
+---
+
+## 11. Testing Standards
+
+Mandatory:
+
+* pytest
+* resource tests
+* service tests
+* schema validation tests
+* auth tests
+* error contract tests
+* pagination tests
+
+✅ **GOOD**
+
+```python
+def test_create_user(client):
+    response = client.post(
+        "/api/v1/users",
+        json={"name": "Alice", "email": "alice@example.com"},
+    )
+    assert response.status_code == 201
+```
+
+---
+
+## 12. Documentation Standards
+
+Flask-RESTful does not provide strong modern OpenAPI tooling.
+
+Preferred:
+
+* flask-pydantic-spec
+* flask-openapi3
+* apispec
+
+Pydantic schemas should be the single source of truth.
+
+---
+
+## 13. When Not to Use Flask-RESTful
+
+Avoid Flask-RESTful for:
+
+* async-first APIs
+* websocket services
+* automatic OpenAPI generation
+* dependency injection heavy systems
+* FastAPI-style typed routing
+
+For those prefer:
+
+* FastAPI
+* Flask-OpenAPI3
+* Flask-Smorest
+
+Use Flask-RESTful when:
+
+* migrating legacy APIs
+* keeping Flask ecosystem consistency
+* wanting lightweight class-based resources
+* existing codebases already depend on it
+
+[1]: https://flask.palletsprojects.com/en/stable/patterns/appfactories/ "Application Factories — Flask Documentation (3.1.x)"
+[2]: https://flask-restful.readthedocs.io/en/latest/intermediate-usage.html "Intermediate Usage — Flask-RESTful 0.3.10 documentation"
+[3]: https://stackoverflow.com/questions/61243848/simple-request-parsing-without-reqparse-requestparser?utm_source=chatgpt.com "python - Simple request parsing without reqparse.RequestParser() - Stack Overflow"
+[4]: https://docs.pydantic.dev/latest/migration/ "Migration Guide - Pydantic Validation"

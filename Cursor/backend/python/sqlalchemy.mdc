@@ -1,0 +1,206 @@
+---
+description: Enforce modern, performant, type‑safe, and maintainable SQLAlchemy 2.x database development practices, aligned with official SQLAlchemy 2.x APIs and recommended loading & session patterns.
+globs: **/*.py
+---
+# SQLAlchemy Best Practices (2.x Style)
+
+This guide defines definitive standards for using **SQLAlchemy 2.x** in Python applications. It follows the official 2.x API, emphasizes static typing, efficient querying, proper session/transaction management, and schema migrations.
+
+---
+
+## 1. Declarative Models with Type Annotations
+
+Always use `DeclarativeBase`, `Mapped`, and `mapped_column()` for ORM models. This enables static typing and clearer model definitions.
+
+```python
+from typing import List, Optional
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import String, ForeignKey, DateTime
+
+class Base(DeclarativeBase):
+    pass
+
+class User(Base):
+    __tablename__ = "user_account"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(30))
+    fullname: Mapped[Optional[str]]
+    addresses: Mapped[List["Address"]] = relationship(back_populates="user")
+```
+
+Using `mapped_column()` with `Mapped` is the modern type‑safe pattern introduced in SQLAlchemy 2.x. ([SQLAlchemy][2])
+
+---
+
+## 2. Context‑Managed Sessions
+
+Use the session as a context manager to ensure proper commit/rollback and cleanup.
+
+```python
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+
+engine = create_engine("sqlite:///test.db")
+Session = sessionmaker(bind=engine)
+
+def create_user(name: str):
+    with Session() as session:
+        user = User(name=name)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+```
+
+This pattern guarantees that transactions are committed on success and rolled back on failure.
+
+---
+
+## 3. Explicit Transactions
+
+For multi‑step operations, use `session.begin()` for transactional safety.
+
+```python
+def transfer_funds(session: Session, from_id: int, to_id: int, amount: float):
+    with session.begin():
+        from_acc = session.get(Account, from_id)
+        to_acc = session.get(Account, to_id)
+        from_acc.balance -= amount
+        to_acc.balance += amount
+```
+
+A transaction block commits only if all operations succeed.
+
+---
+
+## 4. Querying with `select()`
+
+Always use the new `select()` construct. The legacy `session.query()` API is superseded in 2.x.
+
+```python
+from sqlalchemy import select
+
+stmt = select(User).where(User.name == "Alice")
+result = session.scalars(stmt).all()
+```
+
+This is the official, fully supported query pattern. ([SQLAlchemy][3])
+
+---
+
+## 5. Eager Loading to Avoid N+1
+
+Prevent N+1 query issues by eagerly loading relationships with loader options.
+
+### Using `selectinload`
+
+```python
+from sqlalchemy.orm import selectinload
+
+stmt = select(User).options(selectinload(User.addresses))
+users = session.scalars(stmt).all()
+```
+
+`selectinload` emits a secondary SELECT that fetches related objects in one additional query and is generally the recommended eager loading strategy. ([SQLAlchemy][1])
+
+---
+
+## 6. Deferred Columns
+
+Use `mapped_column(deferred=True)` to avoid loading large columns until needed.
+
+```python
+summary: Mapped[str] = mapped_column(Text, deferred=True)
+```
+
+You can override deferred loading at query time with `.options(undefer(...))`. ([SQLAlchemy][4])
+
+---
+
+## 7. Adding, Updating, Deleting
+
+Basic ORM operations are tracked and flushed automatically.
+
+```python
+user.name = "New Name"
+session.commit()
+```
+
+Use `session.delete(obj)` to remove an object and commit thereafter.
+
+---
+
+## 8. Bulk Operations (Use With Caution)
+
+For performance‑sensitive batch operations, use `insert()`/`update()` expressions or `bulk_insert_mappings`, noting they bypass ORM event hooks.
+
+```python
+from sqlalchemy import insert
+
+session.execute(insert(User), data_list)
+session.commit()
+```
+
+---
+
+## 9. Migrations with Alembic
+
+Always use Alembic to manage database schema changes. Never manually alter schema outside migrations.
+
+```bash
+alembic revision --autogenerate -m "migration name"
+alembic upgrade head
+```
+
+This ensures schema evolution is tracked and reproducible.
+
+---
+
+## 10. Static Type Checking
+
+Enable Python type checkers to catch errors early.
+
+In `mypy.ini` or `pyproject.toml`:
+
+```ini
+[mypy]
+plugins = sqlalchemy.ext.mypy.plugin
+```
+
+Use `Mapped[X]` annotations so IDEs and type checkers understand model types.
+
+---
+
+## 11. Loading Strategies Overview
+
+Use the correct relationship loading option depending on use case:
+
+* `selectinload()` — for collections and general eager loading
+* `joinedload()` — for closely related single objects
+* `lazy='raise'` — to prevent accidental lazy loads
+* `deferred()` — to defer large columns until accessed
+
+Setting `lazy="selectin"` on relationships loads efficiently by default. ([SQLAlchemy][1])
+
+---
+
+## 12. Async Usage (Optional)
+
+If using `AsyncSession`, the core patterns remain the same — use async `session.scalars()` and loader options in async code.
+
+---
+
+## 13. Best Practices Summary
+
+* Prefer `DeclarativeBase` with `Mapped` and `mapped_column()` for type safety. ([SQLAlchemy][2])
+* Use context‑managed sessions and explicit transaction blocks.
+* Query with `select()`, never legacy `session.query()`. ([SQLAlchemy][3])
+* Eagerly load relationships with `selectinload()` to prevent N+1. ([SQLAlchemy][1])
+* Defer large columns when not needed. ([SQLAlchemy][4])
+* Manage migrations with Alembic.
+* Enable type checking with `Mapped` and type checking plugins.
+
+[1]: https://docs.sqlalchemy.org/21/orm/queryguide/relationships.html?utm_source=chatgpt.com "Relationship Loading Techniques — SQLAlchemy 2.1 Documentation"
+[2]: https://docs.sqlalchemy.org/en/21/orm/mapping_api.html?utm_source=chatgpt.com "Class Mapping API — SQLAlchemy 2.1 Documentation"
+[3]: https://docs.sqlalchemy.org/en/21/changelog/whatsnew_20.html?utm_source=chatgpt.com "What’s New in SQLAlchemy 2.0? — SQLAlchemy 2.1 Documentation"
+[4]: https://docs.sqlalchemy.org/en/21/orm/queryguide/columns.html?utm_source=chatgpt.com "Column Loading Options — SQLAlchemy 2.1 Documentation"

@@ -1,0 +1,213 @@
+---
+alwaysApply: true
+---
+---
+description: Definitive guidelines for writing maintainable, secure, and scalable Terraform configurations. Focuses on structure, naming, state management, and automation, aligned with official Terraform best practices and HashiCorp recommendations.
+globs: **/*.tf
+---
+# Terraform Best Practices
+
+Terraform configurations are **production‑grade infrastructure code**. They must be readable, vetted, versioned, and governed by automated policies just like any other codebase. The following practices reflect official HashiCorp guidance and widely accepted industry patterns.
+
+---
+
+## 1. Code Organization and Structure
+
+Organize your Terraform for clarity, reuse, and environment isolation, following official recommended patterns.
+
+### 1.1 Project Layout
+
+**Separate environments and shared modules** instead of putting everything in one monolithic config. This improves team isolation, reduces state blast radius, and supports independent lifecycles.
+
+```
+
+├── environments/
+│   ├── dev/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── backend.tf
+│   │   └── terraform.tfvars
+│   ├── prod/
+│       └── ...
+├── modules/
+│   ├── vpc/
+│   ├── s3_bucket/
+│   └── ...
+
+```
+
+### 1.2 Standard File Naming
+
+Adopt consistent file naming for readability:
+
+* `providers.tf` — provider blocks + required providers.
+* `backend.tf` — remote backend configuration.
+* `variables.tf` — variable definitions (sorted alphabetically).
+* `locals.tf` — local values.
+* `main.tf` — root module resources and module calls.
+* `outputs.tf` — outputs (sorted alphabetically).
+
+Consistent naming improves discoverability and aligns with common Terraform style guides. :contentReference[oaicite:2]{index=2}
+
+---
+
+## 2. Naming Conventions
+
+Consistent naming reduces cognitive load and errors.
+
+### 2.1 Resource, Variable, and Output Names
+
+Use **snake_case** for resource blocks, variables, and outputs — matching Terraform style conventions. :contentReference[oaicite:3]{index=3}
+
+❌ Bad:
+```terraform
+resource "aws_s3_bucket" "s3BucketAppLogs" { ... }
+variable "VPCName" { ... }
+````
+
+✅ Good:
+
+```terraform
+resource "aws_s3_bucket" "app_logs" { ... }
+variable "vpc_name" { ... }
+```
+
+### 2.2 Boolean Variables
+
+Boolean flags should be **positive and descriptive**, and end with `_enabled` for clarity. ([Google Cloud][2])
+
+---
+
+## 3. State Management
+
+Remote state and locking are critical for team collaboration.
+
+### 3.1 Remote Backend with Locking
+
+Always use a **remote backend** that supports locking (e.g., S3 with DynamoDB). This prevents concurrent plan/apply collisions and ensures consistent state. ([HashiCorp Developer][3])
+
+### 3.2 State Isolation
+
+Rather than relying on Terraform workspaces for environment separation, **use separate root modules (directories) with their own backend configs**. Terraform documentation advises matching workspaces to isolated configurations, and community consensus discourages using workspaces to scope long‑lived environments. ([HashiCorp Developer][1])
+
+---
+
+## 4. Modules: Reusability and Abstraction
+
+Modules encapsulate and reuse Terraform logic.
+
+### 4.1 Module Design Principles
+
+Modules should be:
+
+* **Single‑purpose** — focus on one logical part of infrastructure.
+* **Composable** — combine modules rather than monolithic collections. ([HashiCorp Developer][4])
+
+Avoid modules that are too large or overly complex — each module should be explainable on its own. ([HashiCorp Developer][4])
+
+### 4.2 Inputs and Outputs
+
+Parameterize what varies, provide meaningful outputs, and document both in module `README.md`. Tag everything to ensure consumers understand context. ([HashiCorp Developer][5])
+
+---
+
+## 5. Common Patterns & Anti‑patterns
+
+### 5.1 Loops and Conditionals
+
+Prefer `for_each` with maps/sets for resource instances to gain stable addressing and improved state handling. ([HashiCorp Developer][5])
+
+### 5.2 Dynamic Blocks
+
+Use `dynamic` blocks for nested repeatable structures based on complex inputs — this reduces repetition and keeps code DRY. ([HashiCorp Developer][5])
+
+### 5.3 Tagging
+
+Use provider `default_tags` to enforce consistent tagging across resources. ([AWS Documentation][6])
+
+---
+
+## 6. Security and Configuration Management
+
+### 6.1 Secrets Management
+
+Never hardcode sensitive values in Terraform code. Fetch sensitive values from a secrets manager at runtime. ([HashiCorp Developer][5])
+
+### 6.2 Limit State Access
+
+Restrict who can read/edit remote state. State can contain sensitive metadata that should not be broadly accessible. ([HashiCorp | An IBM Company][7])
+
+### 6.3 Policy as Code
+
+Integrate policy frameworks like Open Policy Agent (OPA) or Sentinel in CI/CD to enforce security and compliance. ([HashiCorp Developer][5])
+
+---
+
+## 7. Tooling, Automation & CI/CD
+
+### 7.1 Format and Validate
+
+Always run:
+
+* `terraform fmt` — consistent formatting
+* `terraform validate` — catches syntax and configuration issues
+
+Integrate these into Git pre‑commit hooks and CI. ([HashiCorp Developer][5])
+
+### 7.2 Linting
+
+Use TFLint or similar tools to catch issues early (unused variables, deprecated attributes, provider hints). ([HashiCorp Developer][5])
+
+### 7.3 Version Pinning
+
+Pin Terraform CLI version, provider versions, and module versions to prevent unexpected upgrades. Terraform creates a `.terraform.lock.hcl` to lock provider versions and recommend checking it into version control. ([HashiCorp Developer][8])
+
+---
+
+## 8. Lifecycle Management
+
+Use `lifecycle` blocks intentionally:
+
+* `prevent_destroy` — protect critical resources
+* `create_before_destroy` — enable zero‑downtime replacements
+
+These settings help avoid unintentional outages. ([HashiCorp Developer][5])
+
+---
+
+## 9. CI/CD Run Policies
+
+### 9.1 Plan Checks
+
+Every pull request **must** trigger `terraform plan` and publish results to the PR for team review and approval.
+
+### 9.2 Automated Apply
+
+Terraform `apply` should run only on merge to protected branches after plan validation, tests, and policy checks.
+
+---
+
+## 10. Documentation & Testing
+
+* Document modules and environment expectations (`README.md`, examples). ([HashiCorp Developer][5])
+* Write tests (e.g., using Terratest, Kitchen‑Terraform) to validate configs.
+
+---
+
+## Golden Rules
+
+* Remote state + locking is mandatory. ([HashiCorp Developer][3])
+* Pin versions for Terraform, providers, and modules. ([HashiCorp Developer][8])
+* Separate root modules for environments; avoid over‑relying on workspaces. ([HashiCorp Developer][1])
+* Modules should be small, reusable, and well‑documented. ([HashiCorp Developer][4])
+* Always format, validate, lint, and test before merge. ([HashiCorp Developer][5])
+* Treat Terraform code as software: review, plan, test, promote. ([HashiCorp Developer][5])
+
+[1]: https://developer.hashicorp.com/terraform/cloud-docs/workspaces/best-practices?utm_source=chatgpt.com "Best Practices - Workspaces - HCP Terraform | Terraform | HashiCorp Developer"
+[2]: https://cloud.google.com/docs/terraform/best-practices/general-style-structure?utm_source=chatgpt.com "Best practices for general style and structure  |  Terraform  |  Google Cloud"
+[3]: https://developer.hashicorp.com/terraform/language/settings/backends/configuration?utm_source=chatgpt.com "Backend block configuration overview | Terraform | HashiCorp Developer"
+[4]: https://developer.hashicorp.com/terraform/tutorials/modules/pattern-module-creation?utm_source=chatgpt.com "Module creation - recommended pattern | Terraform | HashiCorp Developer"
+[5]: https://developer.hashicorp.com/terraform/language/syntax/style?utm_source=chatgpt.com "Style Guide - Configuration Language | Terraform | HashiCorp Developer"
+[6]: https://docs.aws.amazon.com/prescriptive-guidance/latest/terraform-aws-provider-best-practices/structure.html?utm_source=chatgpt.com "Best practices for code base structure and organization - AWS Prescriptive Guidance"
+[7]: https://www.hashicorp.com/id/blog/terraform-security-5-foundational-practices?utm_source=chatgpt.com "Terraform security: 5 foundational practices"
+[8]: https://developer.hashicorp.com/terraform/language/files/dependency-lock?utm_source=chatgpt.com "Dependency Lock File (.terraform.lock.hcl) - Configuration Language | Terraform | HashiCorp Developer"
