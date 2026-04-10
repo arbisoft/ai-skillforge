@@ -1,4 +1,4 @@
-# ai-guide-rules
+# ai-skillforge
 
 A curated collection of AI coding rules and guidelines for use with [Cursor](https://cursor.sh/) and other AI-assisted development tools.
 
