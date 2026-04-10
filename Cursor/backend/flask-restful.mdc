@@ -1,0 +1,87 @@
+---
+description: Best practices and conventions for Flask-RESTful APIs
+globs: **/*.py
+alwaysApply: false
+---
+
+# Flask-RESTful Rules
+
+## Resource Classes
+
+- Subclass `flask_restful.Resource` for every endpoint; map HTTP methods to same-named methods (`get`, `post`, `put`, `patch`, `delete`).
+- Register resources with `api.add_resource(MyResource, "/path", "/path/<int:id>")`.
+- Keep resource methods thin — delegate logic to a service layer.
+
+```python
+from flask_restful import Resource, Api
+
+api = Api(app)
+
+class OrderList(Resource):
+    def get(self):
+        return {"orders": []}, 200
+
+    def post(self):
+        return {"id": 1}, 201
+
+api.add_resource(OrderList, "/orders")
+```
+
+## Request Parsing
+
+- Use `reqparse.RequestParser` or, preferably, **marshmallow** / **webargs** for input validation and parsing.
+- `reqparse` is deprecated in newer versions — prefer marshmallow schemas with `webargs` for robust validation.
+- Always validate and type-cast incoming data before using it.
+
+```python
+from webargs import fields
+from webargs.flaskparser import use_args
+
+class OrderList(Resource):
+    @use_args({"page": fields.Int(load_default=1)}, location="query")
+    def get(self, args):
+        return {"page": args["page"]}, 200
+```
+
+## Output Formatting
+
+- Use `flask_restful.fields` with `@marshal_with` for consistent response shaping.
+- Prefer marshmallow schemas over `marshal_with` for complex, nested responses.
+- Always return a tuple `(data, status_code)` — omitting the status code defaults to 200 which can mask errors.
+
+## Error Handling
+
+- Customise error responses by setting `errors` dict on the `Api` instance or overriding `handle_error`.
+- Raise `flask_restful.abort(status_code, message="...")` for expected errors.
+- Return consistent error shapes across all endpoints.
+
+```python
+api = Api(app, errors={
+    "ValidationError": {"message": "Invalid input.", "status": 422},
+})
+```
+
+## API Initialisation
+
+- Use the application factory pattern; initialise the `Api` object with `api.init_app(app)`.
+- Group related resources under a `Blueprint` and attach the `Api` to the blueprint.
+
+```python
+from flask import Blueprint
+from flask_restful import Api
+
+orders_bp = Blueprint("orders", __name__)
+orders_api = Api(orders_bp)
+orders_api.add_resource(OrderList, "/orders")
+```
+
+## Authentication
+
+- Use `Flask-JWT-Extended` for JWT-based auth; apply `@jwt_required()` decorator on protected resource methods.
+- For session-based auth, use `Flask-Login` and call `login_required` manually inside resource methods.
+
+## Testing
+
+- Use `app.test_client()` to send requests to resources.
+- Assert both the response status code and the JSON body shape.
+- Isolate tests with a test config and a fresh database per test session.

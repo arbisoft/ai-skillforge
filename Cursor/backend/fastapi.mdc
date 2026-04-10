@@ -1,0 +1,121 @@
+---
+description: Best practices and conventions for FastAPI applications
+globs: **/*.py
+alwaysApply: false
+---
+
+# FastAPI Rules
+
+## Application Setup
+
+- Create the app instance once; use `lifespan` context manager (FastAPI 0.93+) for startup/shutdown logic instead of deprecated `on_event`.
+- Split the app into routers (`APIRouter`) by domain; include them in the main app with a prefix and tags.
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    yield
+    # shutdown
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(orders_router, prefix="/orders", tags=["orders"])
+```
+
+## Path Operations
+
+- Use the most specific decorator: `@router.get`, `@router.post`, `@router.put`, `@router.patch`, `@router.delete`.
+- Always set `response_model` to enforce output schema and strip undeclared fields.
+- Use `status_code` parameter to declare the expected success status (e.g., `status_code=201` for creation).
+- Use `response_model_exclude_unset=True` for partial update responses.
+
+## Pydantic Models
+
+- Use Pydantic v2 (`pydantic>=2.0`) models for all request bodies, response models, and settings.
+- Separate input schemas (request) from output schemas (response) — do not reuse the same model.
+- Use `model_config = ConfigDict(from_attributes=True)` (Pydantic v2) to support ORM object serialisation.
+- Validate and constrain fields using Pydantic field types (`EmailStr`, `AnyHttpUrl`, `conint`, etc.).
+
+```python
+from pydantic import BaseModel, EmailStr, ConfigDict
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    email: EmailStr
+```
+
+## Dependency Injection
+
+- Use `Depends()` for shared logic: DB sessions, auth, pagination params, feature flags.
+- Define dependencies as plain functions or `async` functions — FastAPI resolves them automatically.
+- Use `Annotated` (Python 3.9+) to attach `Depends` to type hints for cleaner signatures.
+
+```python
+from typing import Annotated
+from fastapi import Depends
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+DbSession = Annotated[Session, Depends(get_db)]
+```
+
+## Async vs Sync
+
+- Use `async def` for path operations that perform I/O (DB queries, HTTP calls, file reads).
+- Use plain `def` for CPU-bound or purely synchronous operations — FastAPI runs them in a thread pool automatically.
+- Never mix blocking I/O (e.g., `requests`, synchronous SQLAlchemy) inside `async def` functions; use async libraries (`httpx`, `asyncpg`, SQLAlchemy async) instead.
+
+## Authentication & Security
+
+- Use `OAuth2PasswordBearer` or `HTTPBearer` as security schemes.
+- Validate JWTs with `python-jose` or `PyJWT`; raise `HTTPException(status_code=401)` on failure.
+- Hash passwords with `passlib[bcrypt]`.
+- Use `Depends` to inject the current user into protected routes.
+
+## Error Handling
+
+- Raise `HTTPException(status_code=..., detail="...")` for expected client errors.
+- Register custom exception handlers with `@app.exception_handler(ExceptionClass)` for domain exceptions.
+- Return consistent error response shapes across the API.
+
+## Settings & Configuration
+
+- Use `pydantic-settings` (`BaseSettings`) to load and validate environment variables.
+- Provide a single `get_settings()` function cached with `@lru_cache` and inject it via `Depends`.
+
+```python
+from functools import lru_cache
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    database_url: str
+    secret_key: str
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+```
+
+## Background Tasks
+
+- Use `BackgroundTasks` for fire-and-forget work (emails, audit logs) that should not block the response.
+- Use a proper task queue (Celery, ARQ, or Dramatiq) for heavy or retryable background work.
+
+## Testing
+
+- Use `httpx.AsyncClient` with `ASGITransport` for async tests, or `TestClient` (synchronous wrapper) for simpler cases.
+- Override dependencies with `app.dependency_overrides` in tests.
+- Use `pytest-asyncio` for async test functions.
