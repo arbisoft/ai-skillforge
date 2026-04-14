@@ -3,6 +3,7 @@ description: Reviews pull requests to ensure they follow the PR template and con
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  roles: all
 permissions:
   contents: read
   pull-requests: read
