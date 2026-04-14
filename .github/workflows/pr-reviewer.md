@@ -4,6 +4,12 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
   roles: all
+engine:
+  id: litellm
+  model: xai/grok-4-1-fast-reasoning
+  env:
+    ANTHROPIC_BASE_URL: "https://litellm.arbisoft.com"
+    ANTHROPIC_API_KEY: ${{ secrets.LLM_ROUTER_KEY }}
 permissions:
   contents: read
   pull-requests: read
