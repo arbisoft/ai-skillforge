@@ -5,7 +5,7 @@ on:
     types: [opened, edited, synchronize, reopened]
   roles: all
 engine:
-  id: litellm
+  id: claude
   model: xai/grok-4-1-fast-reasoning
   env:
     ANTHROPIC_BASE_URL: "https://litellm.arbisoft.com"
