@@ -10,6 +10,10 @@ engine:
   env:
     ANTHROPIC_BASE_URL: "https://litellm.arbisoft.com"
     ANTHROPIC_API_KEY: ${{ secrets.LLM_ROUTER_KEY }}
+network:
+  allowed:
+    - github.com
+    - litellm.arbisoft.com  # must be listed here for the firewall to permit outbound requests    
 permissions:
   contents: read
   pull-requests: read
