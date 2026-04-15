@@ -24,7 +24,7 @@ tools:
 safe-outputs:
   add-comment:
     max: 1
-pre-run:
+steps:
   - name: Debug - Verify LiteLLM key reachability
     continue-on-error: true
     run: |
@@ -39,7 +39,7 @@ pre-run:
       echo "HTTP status: $HTTP_STATUS"
       python3 -c "import json; d=json.load(open('/tmp/litellm_resp.json')); print('Error:',d['error'].get('message','unknown')) if 'error' in d else print('Models returned:',len(d.get('data',[]))) " || true
   - name: Debug - Print key fingerprint
-    run: echo -n "${{ secrets.LLM_ROUTER_KEY }}" | sha256sum
+    run: echo -n "$ANTHROPIC_API_KEY" | sha256sum
 ---
 
 # PR Reviewer
