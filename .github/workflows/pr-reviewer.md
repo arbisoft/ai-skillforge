@@ -24,6 +24,31 @@ tools:
 safe-outputs:
   add-comment:
     max: 1
+pre-run:
+  - name: Debug - Verify LiteLLM key reachability
+    continue-on-error: true
+    run: |
+      echo "--- LiteLLM health check ---"
+      curl -sf https://litellm.arbisoft.com/health && echo "Health: OK" || echo "Health: FAILED"
+
+      echo "--- API key validation (key hash only, no key value logged) ---"
+      HTTP_STATUS=$(curl -s -o /tmp/litellm_resp.json -w "%{http_code}" \
+        -H "Authorization: Bearer $ANTHROPIC_API_KEY" \
+        -H "Content-Type: application/json" \
+        https://litellm.arbisoft.com/v1/models)
+      echo "HTTP status: $HTTP_STATUS"
+      python3 -c "
+import json, sys
+try:
+    d = json.load(open('/tmp/litellm_resp.json'))
+    if 'error' in d:
+        print('Error:', d['error'].get('message','unknown'))
+    else:
+        print('Models returned:', len(d.get('data',[])))
+except: pass
+"
+  - name: Debug - Print key fingerprint
+    run: echo -n "${{ secrets.LLM_ROUTER_KEY }}" | sha256sum
 ---
 
 # PR Reviewer
