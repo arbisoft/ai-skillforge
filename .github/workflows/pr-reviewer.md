@@ -37,16 +37,7 @@ pre-run:
         -H "Content-Type: application/json" \
         https://litellm.arbisoft.com/v1/models)
       echo "HTTP status: $HTTP_STATUS"
-      python3 -c "
-import json, sys
-try:
-    d = json.load(open('/tmp/litellm_resp.json'))
-    if 'error' in d:
-        print('Error:', d['error'].get('message','unknown'))
-    else:
-        print('Models returned:', len(d.get('data',[])))
-except: pass
-"
+      python3 -c "import json; d=json.load(open('/tmp/litellm_resp.json')); print('Error:',d['error'].get('message','unknown')) if 'error' in d else print('Models returned:',len(d.get('data',[]))) " || true
   - name: Debug - Print key fingerprint
     run: echo -n "${{ secrets.LLM_ROUTER_KEY }}" | sha256sum
 ---
