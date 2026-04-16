@@ -106,7 +106,19 @@ Based on the `CONTRIBUTING.md` file, verify:
 - **README updated** if a new agent, language rule set, or notable skill was added.
 - **No duplication** with existing content.
 
-### 4. Scan for Sensitive Information
+### 4. Perform Deep Analysis
+
+Beyond basic compliance, analyze for logical consistency and code quality.
+- **Documentation Alignment**: Verify changes match documentation (e.g., README install instructions).
+- **Code Snippets**: Assess performance (e.g., inefficient loops) and scalability (e.g., large inputs).
+- **Logical Issues**: Identify inconsistencies or edge cases.
+- For identified issues, provide brief suggestions to add/remove/update content and include minimal diff excerpts for context.
+
+#### Examples for Deep Analysis
+- **Documentation Misalignment**: 'New rules added but README install missing. Suggestion: Add to README: "Copy rules to ~/.claude/rules/ using cp -r". Diff context: [added rule excerpt].'
+- **Performance Issue**: 'Inefficient loop in rule X. Suggestion: Optimize to O(n) using hash map. Diff context: [loop excerpt].'
+
+### 5. Scan for Sensitive Information
 
 Carefully inspect all added or modified file contents for the following categories of sensitive information (the patterns below are illustrative examples to guide detection — use your best judgment to identify any content that falls into these categories):
 
@@ -119,7 +131,7 @@ Carefully inspect all added or modified file contents for the following categori
 
 This is a **public repository**, so any such information would be publicly visible.
 
-### 5. Post Your Review
+### 6. Post Your Review
 
 After completing your analysis, post **one** review comment that includes all findings organized into sections.
 
@@ -137,6 +149,10 @@ Use this format for your review:
 
 ### Sensitive Information Check
 [List any sensitive data found with file name and approximate location. If nothing found, say ✅ No sensitive information detected.]
+
+### Deep Analysis
+- [Issue description]. Suggestion: [Brief add/remove guidance]. Diff context: [excerpt].
+✅ No issues found.
 
 ### Summary
 [One or two sentences summarizing the overall state of the PR and any action items for the author.]
