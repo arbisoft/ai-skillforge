@@ -118,7 +118,7 @@ Beyond basic compliance, analyze for logical consistency and code quality.
 - **Documentation Misalignment**: 'New rules added but README install missing. Suggestion: Add to README: "Copy rules to ~/.claude/rules/ using cp -r". Diff context: [added rule excerpt].'
 - **Performance Issue**: 'Inefficient loop in rule X. Suggestion: Optimize to O(n) using hash map. Diff context: [loop excerpt].'
 
-### 4. Scan for Sensitive Information
+### 5. Scan for Sensitive Information
 
 Carefully inspect all added or modified file contents for the following categories of sensitive information (the patterns below are illustrative examples to guide detection — use your best judgment to identify any content that falls into these categories):
 
@@ -131,7 +131,7 @@ Carefully inspect all added or modified file contents for the following categori
 
 This is a **public repository**, so any such information would be publicly visible.
 
-### 5. Post Your Review
+### 6. Post Your Review
 
 After completing your analysis, post **one** review comment that includes all findings organized into sections.
 
