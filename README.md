@@ -74,15 +74,6 @@ Copy the agent files you need into `~/.claude/agents/` (global) or `.claude/agen
 
 Rules live in `Claude/rules/` and are organized into a **common** layer plus **language-specific** directories. See [`Claude/rules/README.md`](Claude/rules/README.md) for full installation instructions and details on rule priority.
 
-**Quick install (recommended):**
-
-```bash
-# Install common rules + one or more language-specific rule sets
-./install.sh typescript
-./install.sh python
-./install.sh golang
-```
-
 **Manual install:**
 
 ```bash
