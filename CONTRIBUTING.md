@@ -172,12 +172,35 @@ Cursor rules live in `Cursor/` as `.mdc` files, organized by technology stack.
 
 ---
 
+## Contributing QA Documentation
+
+QA-related contributions should follow the same principles as other content types, with specific attention to quality standards.
+
+### Test Documentation
+
+- Add detailed test documentation to `Claude/rules/test-documentation.md`
+- Follow the standards for test case structure, execution reporting, and defect reporting
+- Ensure alignment with ISTQB best practices
+
+### Exploratory Testing
+
+- Contribute exploratory testing practices to `Claude/skills/exploratory-testing.md`
+- Include practical examples of charters, session reports, and techniques
+- Document integration with Agile workflows
+
+### Agent Integration
+
+- Reference the `qa-specialist` agent in relevant PR descriptions
+- Ensure new testing approaches complement existing automated testing strategies
+- Coordinate with existing skills like `test-automation` and `tdd-workflow`
+
 ## Pull Request Guidelines
 
 - **One logical change per PR** — separate unrelated additions into separate PRs.
 - **Fill in the PR template** — describe what you added, why it's useful, and how you tested it.
 - **Update the README** if you add a new agent, language rule set, or notable skill.
 - **Review your own diff** before requesting review — check for typos, formatting issues, and broken links.
+- **For QA-related contributions**, reference the relevant agents (qa-specialist), skills (exploratory-testing), and rules (test-documentation, testing) to ensure alignment with quality standards.
 
 ---
 
@@ -190,4 +213,5 @@ Before opening a PR, confirm:
 - [ ] YAML frontmatter is present and valid (for agents and skills).
 - [ ] Content is accurate, concise, and free of typos.
 - [ ] No sensitive information (credentials, internal URLs, proprietary data) is included.
-- [ ] README updated if the addition warrants it.
+  - [ ] README updated if the addition warrants it.
+  - [ ] QA-related additions reference appropriate agents, skills, and rules.
