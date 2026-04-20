@@ -145,7 +145,7 @@ Brief description.
 ### Guidelines
 
 - Use **kebab-case** for the directory name and the `name` field.
-- Keep `SKILL.md` **under 500 lines**. Move detailed reference material to separate files in the same directory.
+- Keep `SKILL.md` **under 1100 lines**. Move detailed reference material to separate files in the same directory.
 - Include concrete, executable steps with code examples where helpful.
 - Make the skill self-contained — a reader should be able to follow it without outside context.
 
