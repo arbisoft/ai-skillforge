@@ -108,7 +108,7 @@ High-volume events should be sampled to reduce costs while maintaining visibilit
 ```java
 // Sample 10% of debug logs
 if (Math.random() < 0.1 && logger.isDebugEnabled()) {
-    logger.debug("cache_debug", key=key, value=value);
+    logger.debug("cache_debug key={} value={}", key, value);
 }
 ```
 
