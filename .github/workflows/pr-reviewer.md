@@ -9,7 +9,7 @@ engine:
   model: xai/grok-4-1-fast-reasoning
   env:
     ANTHROPIC_BASE_URL: "https://litellm.arbisoft.com"
-    ANTHROPIC_API_KEY: ${{ secrets.LLM_ROUTER_KEY }}
+    ANTHROPIC_API_KEY: ${{ vars.LLM_ROUTER_KEY }}
 network:
   allowed:
     - github.com
