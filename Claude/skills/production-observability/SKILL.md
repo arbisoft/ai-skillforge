@@ -7,3 +7,12 @@ description: Use when adding logging, metrics, tracing, or alerting to productio
 
 ## Overview
 Make systems observable through logging (events), metrics (trends), tracing (flows), and alerting (notifications). Core principle: Instrument proactively - gather evidence before issues occur to turn unknowns into knowns.
+
+## When to Use
+- Debugging production-only or intermittent failures
+- Adding monitoring to new features before deploy
+- Investigating performance, errors, or anomalies
+- Setting up alerts for critical thresholds
+- When systematic-debugging needs production data
+
+Do NOT use for local dev bugs (use systematic-debugging).
