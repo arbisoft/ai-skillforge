@@ -51,12 +51,19 @@ logger.info({ username, timestamp: new Date(), ip: clientIp }, 'login_attempt');
 #### Python Example
 ```python
 import structlog
+from datetime import datetime
+
+structlog.configure(
+    processors=[
+        structlog.processors.JSONRenderer()
+    ]
+)
 
 logger = structlog.get_logger()
-logger.info("login_attempt", username=username, timestamp=datetime.now(), ip=client_ip)
+logger.info("login_attempt", username=username, timestamp=datetime.now().isoformat(), ip=client_ip)
 
-# Produces JSON:
-// {"event":"login_attempt","username":"john","timestamp":"...","ip":"...","level":"info"}
+# Produces JSON output similar to:
+# {"event": "login_attempt", "username": "john", "timestamp": "...", "ip": "..."}
 ```
 
 #### Go Example
