@@ -418,17 +418,25 @@ Tracing follows requests across multiple services to visualize latency and ident
 
 #### Java/Spring Boot Example
 ```java
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+
 @Service
 class UserService {
 
-    @Span("UserService.getUserById")  // Create span
+    @WithSpan("UserService.getUserById")  // Create span
     public User getUserById(Long id) {
-        // Span automatically created by @Span annotation
+        // Span automatically created by @WithSpan annotation
         return userRepository.findById(id);
     }
 
     public User createUser(CreateUserRequest request) {
-        Tracer tracer = OpenTelemetry.getGlobalTracer();
+        Tracer tracer = GlobalOpenTelemetry.getTracer("UserService");
         Span span = tracer.spanBuilder("UserService.createUser")
             .setSpanKind(SpanKind.SERVER)
             .startSpan();
