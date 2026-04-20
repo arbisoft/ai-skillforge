@@ -177,12 +177,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { Button } from './Button'
 
 describe('Button Component', () => {
-  it('renders with correct text', () => {
+  it('should render the button with correct text', () => {
     render(<Button>Click me</Button>)
     expect(screen.getByText('Click me')).toBeInTheDocument()
   })
 
-  it('calls onClick when clicked', () => {
+  it('should call onClick when clicked', () => {
     const handleClick = jest.fn()
     render(<Button onClick={handleClick}>Click</Button>)
 
@@ -191,7 +191,7 @@ describe('Button Component', () => {
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
 
-  it('is disabled when disabled prop is true', () => {
+  it('should disable the button when disabled prop is true', () => {
     render(<Button disabled>Click</Button>)
     expect(screen.getByRole('button')).toBeDisabled()
   })

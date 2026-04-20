@@ -33,7 +33,7 @@ MANDATORY workflow:
 Prefer Arrange-Act-Assert structure for tests:
 
 ```typescript
-test('calculates similarity correctly', () => {
+test('should calculate similarity correctly', () => {
   // Arrange
   const vector1 = [1, 0, 0]
   const vector2 = [0, 1, 0]
