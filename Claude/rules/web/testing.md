@@ -27,12 +27,14 @@
 
 - Minimum: Chrome, Firefox, Safari
 - Test scrolling, motion, and fallback behavior
+- Use Playwright projects for Chromium, Firefox, and WebKit coverage
 
 ### 5. Responsive
 
 - Test 320, 375, 768, 1024, 1440, 1920
 - Verify no overflow
 - Verify touch interactions
+- Add at least one Android-sized and one iPhone-sized mobile-web project when touch behavior matters
 
 ## E2E Shape
 

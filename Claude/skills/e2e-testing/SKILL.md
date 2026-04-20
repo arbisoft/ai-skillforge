@@ -26,49 +26,85 @@ tests/
 ├── fixtures/
 │   ├── auth.ts
 │   └── data.ts
+├── pageObjects/
+│   └── components/
+│   │   └── base.component.ts
+│   │   └── header.component.ts
+│   └── pages/
+│       └── base.page.ts
+│       └── items.page.ts
+├── types/
+│   └── searchData.ts
+│   └── loginData.ts
+├── utils/
+│   ├── browserHelpers.ts
+│   └── dateUtils.ts
 └── playwright.config.ts
 ```
 
 ## Page Object Model (POM)
 
 ```typescript
-import { Page, Locator } from '@playwright/test'
+import { expect, Locator, Page } from '@playwright/test'
+
+export class Header {
+  readonly profileMenuButton: Locator
+
+  constructor(private readonly page: Page) {
+    this.profileMenuButton = page.getByTestId('profile-menu-button')
+  }
+
+  async openProfileMenu(): Promise<void> {
+    await this.profileMenuButton.click()
+  }
+}
 
 export class ItemsPage {
-  readonly page: Page
   readonly searchInput: Locator
   readonly itemCards: Locator
   readonly createButton: Locator
+  readonly header: Header
 
-  constructor(page: Page) {
-    this.page = page
-    this.searchInput = page.locator('[data-testid="search-input"]')
-    this.itemCards = page.locator('[data-testid="item-card"]')
-    this.createButton = page.locator('[data-testid="create-btn"]')
+  constructor(private readonly page: Page) {
+    this.searchInput = page.getByTestId('search-input')
+    this.itemCards = page.getByTestId('item-card')
+    this.createButton = page.getByTestId('create-btn')
+    this.header = new Header(page)
   }
 
-  async goto() {
+  async goto(): Promise<void> {
     await this.page.goto('/items')
-    await this.page.waitForLoadState('networkidle')
+    await this.searchInput.waitFor({ state: 'visible', timeout: 5000 });
   }
 
-  async search(query: string) {
+  async search(query: string): Promise<void> {
     await this.searchInput.fill(query)
     await this.page.waitForResponse(resp => resp.url().includes('/api/search'))
-    await this.page.waitForLoadState('networkidle')
+    await this.itemCards.first().waitFor({ state: 'visible', timeout: 5000 });
   }
 
-  async getItemCount() {
-    return await this.itemCards.count()
+  async openCreateFlow(): Promise<void> {
+    await this.createButton.click()
+  }
+
+  async getItemCount(): Promise<number> {
+    return this.itemCards.count()
   }
 }
 ```
+
+### POM Rules
+
+- Exported page object methods should have explicit return types.
+- Prefer `getByTestId`, `getByRole`, and `getByLabel` before CSS selectors.
+- Keep repeated UI fragments such as headers, dialogs, or sidebars in reusable component objects.
+- Do not hide assertions inside page objects; keep high-signal business assertions visible in the test.
 
 ## Test Structure
 
 ```typescript
 import { test, expect } from '@playwright/test'
-import { ItemsPage } from '../../pages/ItemsPage'
+import { ItemsPage } from '../../pageObjects/pages/items.page'
 
 test.describe('Item Search', () => {
   let itemsPage: ItemsPage
@@ -95,6 +131,39 @@ test.describe('Item Search', () => {
     expect(await itemsPage.getItemCount()).toBe(0)
   })
 })
+```
+
+## Fixtures, Types, and Utils Setup
+
+### Fixtures
+
+```typescript
+import { LoginData } from '../types/loginData';
+
+export const auth: LoginData = {
+  emailAddress: 'testing@testmail.com',
+  password: 'Password123',
+};
+```
+
+### Types
+
+```typescript
+export interface LoginData {
+  emailAddress: string;
+  password: string;
+}
+```
+
+### Utils
+
+```typescript
+export class DateUtils {
+  static formatToISO(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+  // more functions...
+}
 ```
 
 ## Playwright Configuration
@@ -125,7 +194,8 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
+    { name: 'mobile-android', use: { ...devices['Pixel 5'] } },
+    { name: 'mobile-ios', use: { ...devices['iPhone 13'] } },
   ],
   webServer: {
     command: 'npm run dev',
@@ -141,12 +211,12 @@ export default defineConfig({
 ### Quarantine
 
 ```typescript
-test('flaky: complex search', async ({ page }) => {
+test('flaky: should perform a complex search', async ({ page }) => {
   test.fixme(true, 'Flaky - Issue #123')
   // test code...
 })
 
-test('conditional skip', async ({ page }) => {
+test('flaky in CI: should show filtered results', async ({ page }) => {
   test.skip(process.env.CI, 'Flaky in CI - Issue #123')
   // test code...
 })
@@ -185,9 +255,9 @@ await page.waitForResponse(resp => resp.url().includes('/api/data'))
 await page.click('[data-testid="menu-item"]')
 
 // Good: wait for stability
-await page.locator('[data-testid="menu-item"]').waitFor({ state: 'visible' })
-await page.waitForLoadState('networkidle')
-await page.locator('[data-testid="menu-item"]').click()
+const menuItem = page.getByTestId('menu-item')
+await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+await menuItem.click()
 ```
 
 ## Artifact Management
@@ -280,7 +350,7 @@ jobs:
 ## Wallet / Web3 Testing
 
 ```typescript
-test('wallet connection', async ({ page, context }) => {
+test('should connect wallet', async ({ page, context }) => {
   // Mock wallet provider
   await context.addInitScript(() => {
     window.ethereum = {
@@ -302,7 +372,7 @@ test('wallet connection', async ({ page, context }) => {
 ## Financial / Critical Flow Testing
 
 ```typescript
-test('trade execution', async ({ page }) => {
+test('should execute trade', async ({ page }) => {
   // Skip on production — real money
   test.skip(process.env.NODE_ENV === 'production', 'Skip on production')
 
