@@ -542,8 +542,15 @@ Trace context must flow across service boundaries.
 @Component
 class ExternalServiceClient {
 
+    private final OpenTelemetry openTelemetry;
     private final Tracer tracer;
     private final RestTemplate restTemplate;
+
+    public ExternalServiceClient(OpenTelemetry openTelemetry, RestTemplate restTemplate) {
+        this.openTelemetry = openTelemetry;
+        this.tracer = openTelemetry.getTracer("ExternalServiceClient");
+        this.restTemplate = restTemplate;
+    }
 
     public ExternalApiResponse callExternal(String userId) {
         Span span = tracer.spanBuilder("external-service.call")
@@ -552,7 +559,7 @@ class ExternalServiceClient {
 
         try (Scope scope = span.makeCurrent()) {
             HttpHeaders headers = new HttpHeaders();
-            tracer.getTextMapPropagator().inject(
+            openTelemetry.getPropagators().getTextMapPropagator().inject(
                 Context.current(),
                 headers,
                 HttpHeaders::set
