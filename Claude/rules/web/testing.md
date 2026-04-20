@@ -39,7 +39,7 @@
 ```ts
 import { test, expect } from '@playwright/test';
 
-test('landing hero loads', async ({ page }) => {
+test('should load landing hero', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('h1')).toBeVisible();
 });

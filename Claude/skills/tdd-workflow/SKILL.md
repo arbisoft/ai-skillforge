@@ -76,19 +76,19 @@ For each user journey, create comprehensive test cases:
 
 ```typescript
 describe('Semantic Search', () => {
-  it('returns relevant markets for query', async () => {
+  it('should return relevant markets for query', async () => {
     // Test implementation
   })
 
-  it('handles empty query gracefully', async () => {
+  it('should handle empty query gracefully', async () => {
     // Test edge case
   })
 
-  it('falls back to substring search when Redis unavailable', async () => {
+  it('should fall back to substring search when Redis unavailable', async () => {
     // Test fallback behavior
   })
 
-  it('sorts results by similarity score', async () => {
+  it('should sort results by similarity score', async () => {
     // Test sorting logic
   })
 })
@@ -233,22 +233,22 @@ describe('GET /api/markets', () => {
 ```typescript
 import { test, expect } from '@playwright/test'
 
-test('user can search and filter markets', async ({ page }) => {
+test('should let user search and filter markets', async ({ page }) => {
   // Navigate to markets page
   await page.goto('/')
-  await page.click('a[href="/markets"]')
+  await page.locator('a[href="/markets"]').click()
 
   // Verify page loaded
   await expect(page.locator('h1')).toContainText('Markets')
 
   // Search for markets
-  await page.fill('input[placeholder="Search markets"]', 'election')
+  await page.locator('input[placeholder="Search markets"]').fill('election')
 
-  // Wait for debounce and results
-  await page.waitForTimeout(600)
+  // Wait for the filtered result set to settle 
+  const results = page.locator('[data-testid="market-card"]')
+  await results.first().waitFor({ state: 'visible', timeout: 5000 });
 
   // Verify search results displayed
-  const results = page.locator('[data-testid="market-card"]')
   await expect(results).toHaveCount(5, { timeout: 5000 })
 
   // Verify results contain search term
@@ -256,23 +256,23 @@ test('user can search and filter markets', async ({ page }) => {
   await expect(firstResult).toContainText('election', { ignoreCase: true })
 
   // Filter by status
-  await page.click('button:has-text("Active")')
+  await page.locator('button:has-text("Active")').click()
 
   // Verify filtered results
   await expect(results).toHaveCount(3)
 })
 
-test('user can create a new market', async ({ page }) => {
+test('should let user create a new market', async ({ page }) => {
   // Login first
   await page.goto('/creator-dashboard')
 
   // Fill market creation form
-  await page.fill('input[name="name"]', 'Test Market')
-  await page.fill('textarea[name="description"]', 'Test description')
-  await page.fill('input[name="endDate"]', '2025-12-31')
+  await page.locator('input[name="name"]').fill('Test Market')
+  await page.locator('textarea[name="description"]').fill('Test description')
+  await page.locator('input[name="endDate"]').fill('2025-12-31')
 
   // Submit form
-  await page.click('button[type="submit"]')
+  await page.locator('button[type="submit"]').click()
 
   // Verify success message
   await expect(page.locator('text=Market created successfully')).toBeVisible()
