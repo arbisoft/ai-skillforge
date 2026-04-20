@@ -78,11 +78,11 @@ Use levels appropriately to control volume and enable production filtering.
 
 | Level | Use For | Example |
 |-------|---------|---------|
-| ERROR | Failures requiring intervention | `log.error("payment_failed", error=err)` |
-| WARN | Unexpected but non-failing conditions | `log.warn("cache_miss", key=cacheKey)` |
-| INFO | Normal operation, business events | `log.info("order_created", orderId=123)` |
-| DEBUG | Detailed execution flow | `log.debug("cache_hit", key=cacheKey, value=result)` |
-| TRACE | Very detailed, typically disabled | `log.trace("db_query", sql=query, params=params)` |
+| ERROR | Failures requiring intervention | `log.error("payment_failed paymentId={} userId={}", paymentId, userId, err)` |
+| WARN | Unexpected but non-failing conditions | `log.warn("cache_miss key={}", cacheKey)` |
+| INFO | Normal operation, business events | `log.info("order_created orderId={}", 123)` |
+| DEBUG | Detailed execution flow | `log.debug("cache_hit key={} value={}", cacheKey, result)` |
+| TRACE | Very detailed, typically disabled | `log.trace("db_query sql={} params={}", query, params)` |
 
 **Production filtering:**
 ```yaml
