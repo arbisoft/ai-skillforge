@@ -1,62 +1,53 @@
 ---
 type: skill
 name: test-environment-management
-description: Comprehensive framework for managing test environments, configuration, data provisioning, isolation, and lifecycle automation.
+description: Framework for managing test environments, configuration, data provisioning, isolation, and lifecycle automation.
 origin: ECC
 ---
 
-# Test Environment Management Framework
+# Test Environment Management
 
-Systematic approach to creating, maintaining, and scaling test environments that accurately reflect production while ensuring isolation and reliability.
+Use this skill to design, provision, configure, isolate, monitor, and retire test environments that reflect production behavior without compromising reliability or safety.
 
-## Environment Configuration
+## When to use this skill
 
-### Configuration Hierarchy
+- Defining environment tiers for development, staging, integration, end-to-end, or performance testing
+- Standardizing configuration, secrets handling, and data provisioning across environments
+- Automating lifecycle tasks such as setup, reset, teardown, and drift detection
+- Improving environment isolation, observability, and reproducibility in CI/CD pipelines
 
-```
-environments/
-├── common/
-│   ├── config.yaml
-│   ├── security.yaml
-│   └── logging.yaml
-├── development/
-│   ├── base.yaml
-│   ├── overrides.yaml
-│   └── secrets-dev.enc
-├── staging/
-│   ├── base.yaml
-│   ├── overrides.yaml
-│   └── secrets-staging.enc
-├── production/
-│   ├── base.yaml
-│   ├── overrides.yaml
-│   └── secrets-prod.enc
-└── test-specific/
-    ├── integration.yaml
-    ├── e2e.yaml
-    └── performance.yaml
-```
+## Core areas
 
-### Configuration Management
+- Environment configuration and hierarchy
+- Test data provisioning and reset strategies
+- Isolation and parallel test execution
+- CI workflow integration
+- Cloud provisioning and ephemeral environments
+- Monitoring, health checks, and incident response
 
-```yaml
-# environments/common/config.yaml
-app:
-  name: "MyApplication"
-  version: "1.0.0"
-  environment: "${DEPLOY_ENV}"
+## Recommended reference file split
 
-api:
-  base_url: "${API_BASE_URL}"
-  timeout: 30000
-  retry_attempts: 3
+Keep this primary skill file concise and move detailed reference material into companion files such as:
 
-logging:
-  level: "${LOG_LEVEL}"
-  format: "json"
-  audit_trail: true
+- `references/configuration.md`
+- `references/test-data.md`
+- `references/isolation.md`
+- `references/ci-workflow.md`
+- `references/cloud-provisioning.md`
+- `references/monitoring.md`
 
-security:
+## Quick guidance
+
+1. Start from a shared baseline configuration.
+2. Apply environment-specific overrides and secrets securely.
+3. Provision deterministic test data and clear teardown rules.
+4. Isolate tests by tenant, namespace, account, or ephemeral stack.
+5. Add health checks, observability, and drift detection.
+6. Prefer automation for creation, reset, and cleanup.
+
+## Notes
+
+Detailed examples, large YAML samples, CI workflows, cloud provisioning guidance, and monitoring runbooks should be stored in the reference files listed above rather than embedded in the primary skill document.
   ssl_required: true
   cors:
     allowed_origins: ["${FRONTEND_URL}"]
