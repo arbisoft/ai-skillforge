@@ -27,14 +27,14 @@ tests/
 │   ├── auth.ts
 │   └── data.ts
 ├── pageObjects/
-│   └── components/
-│   │   └── base.component.ts
+│   ├── components/
+│   │   ├── base.component.ts
 │   │   └── header.component.ts
 │   └── pages/
-│       └── base.page.ts
+│       ├── base.page.ts
 │       └── items.page.ts
 ├── types/
-│   └── searchData.ts
+│   ├── searchData.ts
 │   └── loginData.ts
 ├── utils/
 │   ├── browserHelpers.ts
@@ -45,7 +45,7 @@ tests/
 ## Page Object Model (POM)
 
 ```typescript
-import { expect, Locator, Page } from '@playwright/test'
+import { Page, Locator } from '@playwright/test'
 
 export class Header {
   readonly profileMenuButton: Locator
@@ -74,13 +74,13 @@ export class ItemsPage {
 
   async goto(): Promise<void> {
     await this.page.goto('/items')
-    await this.searchInput.waitFor({ state: 'visible', timeout: 5000 });
+    await this.searchInput.waitFor({ state: 'visible', timeout: 5000 })
   }
 
   async search(query: string): Promise<void> {
     await this.searchInput.fill(query)
     await this.page.waitForResponse(resp => resp.url().includes('/api/search'))
-    await this.itemCards.first().waitFor({ state: 'visible', timeout: 5000 });
+    await this.itemCards.first().waitFor({ state: 'visible', timeout: 5000 })
   }
 
   async openCreateFlow(): Promise<void> {
@@ -127,7 +127,7 @@ test.describe('Item Search', () => {
   test('should handle no results', async ({ page }) => {
     await itemsPage.search('xyznonexistent123')
 
-    await expect(page.locator('[data-testid="no-results"]')).toBeVisible()
+    await expect(page.getByTestId('no-results')).toBeVisible()
     expect(await itemsPage.getItemCount()).toBe(0)
   })
 })
@@ -138,12 +138,12 @@ test.describe('Item Search', () => {
 ### Fixtures
 
 ```typescript
-import { LoginData } from '../types/loginData';
+import { LoginData } from '../types/loginData'
 
 export const auth: LoginData = {
   emailAddress: 'testing@testmail.com',
   password: 'Password123',
-};
+}
 ```
 
 ### Types
@@ -160,7 +160,7 @@ export interface LoginData {
 ```typescript
 export class DateUtils {
   static formatToISO(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split('T')[0]
   }
   // more functions...
 }
@@ -237,7 +237,7 @@ npx playwright test tests/search.spec.ts --retries=3
 await page.click('[data-testid="button"]')
 
 // Good: auto-wait locator
-await page.locator('[data-testid="button"]').click()
+await page.getByTestId('button').click()
 ```
 
 **Network timing:**
@@ -256,7 +256,7 @@ await page.click('[data-testid="menu-item"]')
 
 // Good: wait for stability
 const menuItem = page.getByTestId('menu-item')
-await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+await menuItem.waitFor({ state: 'visible', timeout: 5000 })
 await menuItem.click()
 ```
 
@@ -267,7 +267,7 @@ await menuItem.click()
 ```typescript
 await page.screenshot({ path: 'artifacts/after-login.png' })
 await page.screenshot({ path: 'artifacts/full-page.png', fullPage: true })
-await page.locator('[data-testid="chart"]').screenshot({ path: 'artifacts/chart.png' })
+await page.getByTestId('chart').screenshot({ path: 'artifacts/chart.png' })
 ```
 
 ### Traces
@@ -364,8 +364,8 @@ test('should connect wallet', async ({ page, context }) => {
   })
 
   await page.goto('/')
-  await page.locator('[data-testid="connect-wallet"]').click()
-  await expect(page.locator('[data-testid="wallet-address"]')).toContainText('0x1234')
+  await page.getByTestId('connect-wallet').click()
+  await expect(page.getByTestId('wallet-address')).toContainText('0x1234')
 })
 ```
 
@@ -377,20 +377,20 @@ test('should execute trade', async ({ page }) => {
   test.skip(process.env.NODE_ENV === 'production', 'Skip on production')
 
   await page.goto('/markets/test-market')
-  await page.locator('[data-testid="position-yes"]').click()
-  await page.locator('[data-testid="trade-amount"]').fill('1.0')
+  await page.getByTestId('position-yes').click()
+  await page.getByTestId('trade-amount').fill('1.0')
 
   // Verify preview
-  const preview = page.locator('[data-testid="trade-preview"]')
+  const preview = page.getByTestId('trade-preview')
   await expect(preview).toContainText('1.0')
 
   // Confirm and wait for blockchain
-  await page.locator('[data-testid="confirm-trade"]').click()
+  await page.getByTestId('confirm-trade').click()
   await page.waitForResponse(
     resp => resp.url().includes('/api/trade') && resp.status() === 200,
     { timeout: 30000 }
   )
 
-  await expect(page.locator('[data-testid="trade-success"]')).toBeVisible()
+  await expect(page.getByTestId('trade-success')).toBeVisible()
 })
 ```

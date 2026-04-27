@@ -244,9 +244,9 @@ test('should let user search and filter markets', async ({ page }) => {
   // Search for markets
   await page.locator('input[placeholder="Search markets"]').fill('election')
 
-  // Wait for the filtered result set to settle 
-  const results = page.locator('[data-testid="market-card"]')
-  await results.first().waitFor({ state: 'visible', timeout: 5000 });
+  // Wait for the filtered result set to settle
+  const results = page.getByTestId('market-card')
+  await results.first().waitFor({ state: 'visible', timeout: 5000 })
 
   // Verify search results displayed
   await expect(results).toHaveCount(5, { timeout: 5000 })
