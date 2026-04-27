@@ -33,7 +33,7 @@ MANDATORY workflow:
 Prefer Arrange-Act-Assert structure for tests:
 
 ```typescript
-test('calculates similarity correctly', () => {
+test('should calculate similarity correctly', () => {
   // Arrange
   const vector1 = [1, 0, 0]
   const vector2 = [0, 1, 0]
@@ -50,8 +50,11 @@ test('calculates similarity correctly', () => {
 
 Use descriptive names that explain the behavior under test:
 
+- Prefer `should` phrasing for test names.
+- Use present-tense behavior statements that read clearly in test output.
+
 ```typescript
-test('returns empty array when no markets match query', () => {})
-test('throws error when API key is missing', () => {})
-test('falls back to substring search when Redis is unavailable', () => {})
+test('should return empty array when no markets match query', () => {})
+test('should throw error when API key is missing', () => {})
+test('should fall back to substring search when Redis is unavailable', () => {})
 ```

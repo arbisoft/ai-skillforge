@@ -58,6 +58,7 @@ npx playwright show-report                 # View HTML report
 ### 2. Create
 - Use Page Object Model (POM) pattern
 - Prefer `data-testid` locators over CSS/XPath
+- Prefer locator-based Playwright actions over raw `page.click()` and `page.fill()`
 - Add assertions at key steps
 - Capture screenshots at critical points
 - Use proper waits (never `waitForTimeout`)
@@ -80,7 +81,7 @@ npx playwright show-report                 # View HTML report
 
 ```typescript
 // Quarantine
-test('flaky: market search', async ({ page }) => {
+test('flaky: should show market search results', async ({ page }) => {
   test.fixme(true, 'Flaky - Issue #123')
 })
 
@@ -89,6 +90,11 @@ test('flaky: market search', async ({ page }) => {
 ```
 
 Common causes: race conditions (use auto-wait locators), network timing (wait for response), animation timing (wait for `networkidle`).
+
+## Coverage Expectations
+
+- Browser: Chromium, Firefox, WebKit for critical web flows
+- Mobile web: at least one Android-sized and one iPhone-sized device profile when touch behavior matters
 
 ## Success Metrics
 
