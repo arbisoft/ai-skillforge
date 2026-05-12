@@ -1,0 +1,19 @@
+{
+  "name": "junior-dev",
+  "description": "End-to-end development workflow: researcher, planner, and implementer agents orchestrated into a single test-driven research-plan-implement pipeline.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Abdul Rafey (abdulrafey1)"
+  },
+  "commands": [
+    "./skills/research/research.md",
+    "./skills/plan/plan.md",
+    "./skills/implement/implement.md"
+  ],
+  "agents": [
+    "./agents/researcher/researcher.md",
+    "./agents/planner/planner.md",
+    "./agents/implementer/implementer.md",
+    "./agents/orchestrator/orchestrator.md"
+  ]
+}
