@@ -6,9 +6,9 @@
     "name": "Abdul Rafey (abdulrafey1)"
   },
   "commands": [
-    "./skills/research/research.md",
-    "./skills/plan/plan.md",
-    "./skills/implement/implement.md"
+    "./skills/research/SKILL.md",
+    "./skills/plan/SKILL.md",
+    "./skills/implement/SKILL.md"
   ],
   "agents": [
     "./agents/researcher/researcher.md",

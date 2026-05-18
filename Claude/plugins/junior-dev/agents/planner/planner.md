@@ -2,6 +2,7 @@
 name: planner
 description: "Reads a research.md file produced by the researcher agent and writes a test-driven, task-by-task implementation plan to plan.md. Invoke after the researcher agent has completed its output and before any implementation begins."
 model: sonnet
+tools: ["Read", "Write"]
 color: blue
 memory: none
 ---

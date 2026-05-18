@@ -2,6 +2,7 @@
 name: implementer
 description: "Reads a plan.md file produced by the planner agent and executes every task using strict test-driven development (Red-Yellow-Green). Invoke after the planner has produced its output and the user is ready to begin implementation."
 model: haiku
+tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 color: green
 memory: none
 ---

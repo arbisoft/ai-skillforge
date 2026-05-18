@@ -2,6 +2,7 @@
 name: researcher
 description: "Researches a user's query against the codebase — maps current implementation, identifies impacted files, and writes a research.md output file for a downstream implementation agent. Invoke when you need a thorough codebase investigation before any code is written."
 model: sonnet
+tools: ["Read", "Grep", "Glob", "Write"]
 color: yellow
 memory: none
 ---

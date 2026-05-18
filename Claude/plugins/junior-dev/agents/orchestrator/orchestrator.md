@@ -2,6 +2,7 @@
 name: orchestrator
 description: "Main entry point for the junior-dev workflow. Takes the user's query and orchestrates the researcher, planner, and implementer agents in sequence — passing outputs between them and confirming with the user at each phase boundary before continuing."
 model: sonnet
+tools: ["Task", "Read", "Glob"]
 color: purple
 memory: none
 ---
