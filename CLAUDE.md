@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Repository Maintenance
 - No build/lint/test scripts exist - this is a documentation repository.
-- Use `git log` to see recent changes, often involving additions of new agents (47 total), skills (183 total), and rules.
+- Use `git log` to see recent changes, often involving additions of new agents (47 total), skills (185 total), and rules.
 
 ## Architecture Overview
 
@@ -25,7 +25,7 @@ This repository is a curated collection of AI coding rules, guidelines, agent de
   - common/: Language-agnostic principles (coding-style.md, testing.md, security.md, patterns.md, hooks.md, agents.md)
   - Language directories (typescript/, python/, golang/, web/, swift/, php/, cpp/, csharp/, dart/, java/, kotlin/, perl/, rust/): Extend common rules with technology-specific guidance
   - Rules define standards; skills provide actionable workflows.
-- **skills/**: 183 agent skills as directories containing SKILL.md files with specialized workflows. Examples: create-pr, pr-review, django-patterns, python-testing, security-review, tdd-workflow, git-workflow, api-design.
+- **skills/**: 185 agent skills as directories containing SKILL.md files with specialized workflows. Examples: create-pr, pr-review, django-patterns, python-testing, security-review, tdd-workflow, git-workflow, api-design.
 
 ### Cursor/ Directory
 - Contains .mdc rule files for Cursor IDE, organized by technology stack:
