@@ -107,7 +107,7 @@ Copy the skill directories you need into `~/.claude/skills/` (global) or `.claud
 | [git-workflow](Claude/skills/git-workflow/SKILL.md) | Git branching, committing, and collaboration workflow |
 | [api-design](Claude/skills/api-design/SKILL.md) | REST and API design guidelines |
 
-> 183 skills are available across domains including backend, frontend, DevOps, AI/ML, and more. Browse [`Claude/skills/`](Claude/skills/) for the full list.
+> 185 skills are available across domains including backend, frontend, DevOps, AI/ML, and more. Browse [`Claude/skills/`](Claude/skills/) for the full list.
 
 ---
 
